@@ -13,7 +13,7 @@ Unité : **BODY_HEIGHT = 1.000** (fond → bas de la bague). Aucune cote usine :
 |---|---|
 | `export/SKLUBS_BOTTLE_MASTER.blend` | scène complète, collections du protocole, image de référence empaquetée, caméras, éclairage, variantes |
 | `export/SKLUBS_BOTTLE_MASTER.glb` | master pleine résolution : 7 pièces, UV, zones d'impression, animation de l'anse |
-| `export/SKLUBS_BOTTLE_WEB.glb` | même géométrie, compression Draco (~106 Ko). Côté Three.js, charger avec `DRACOLoader` |
+| `export/SKLUBS_BOTTLE_WEB.glb` | même géométrie, compression Draco (~100 Ko). Côté Three.js, charger avec `DRACOLoader` |
 | `export/SKLUBS_BOTTLE_UV.png` | gabarit du déroulé du corps : zones face / dos / 360°, axe, couture |
 | `export/color_variants.json` | six teintes de validation (échantillonnées, indicatives) |
 | `renders/` | vues front / back / left / right / top / 3q, macros bouchon et anse, anse rabattue, six couleurs, caméra de référence, calque 50/50 |

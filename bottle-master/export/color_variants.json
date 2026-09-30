@@ -1,0 +1,11 @@
+{
+ "variants": {
+  "BLACK": "#171717",
+  "YELLOW": "#CFB40B",
+  "BLUE": "#78BEE1",
+  "ORANGE": "#D14A14",
+  "OLIVE": "#404330",
+  "PINK": "#ED899F"
+ },
+ "mode": "instances li\u00e9es : un seul mesh BODY, mat\u00e9riau surcharg\u00e9 par objet"
+}
