@@ -41,6 +41,7 @@ export function computePrice(product, cfg) {
   const base = need('prix de base', p.basePriceBySize?.[cfg.size]);
   const mat = need('supplément matière', p.materialSurcharge?.[cfg.material]);
   const fin = need('supplément finition', p.finishSurcharge?.[cfg.finish]);
+  const ring = p.ringSurcharge ? need('supplément bague', p.ringSurcharge[cfg.colors?.ring]) : 0;
   let method = 0;
   let setup = 0;
   if (cfg.hasArtwork) {
@@ -57,7 +58,7 @@ export function computePrice(product, cfg) {
     for (const t of p.quantityDiscounts) if (qty >= t.min) discount = t.discount;
   }
 
-  const unit = (base + mat + fin + method) * (1 - discount) + setup / qty;
+  const unit = (base + mat + fin + ring + method) * (1 - discount) + setup / qty;
   const status = reasons.length ? 'factory' : belowMoq ? 'factory' : p.priceMode === 'estimated' ? 'estimated' : 'instant';
 
   return {

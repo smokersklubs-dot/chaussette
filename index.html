@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>SKLUBS — Configurateur Bouteille 3D</title>
+  <link rel="modulepreload" href="js/viewer.js">
+  <link rel="preload" href="bottle-master/export/SKLUBS_BOTTLE_WEB.glb" as="fetch" crossorigin>
   <meta name="description" content="Configurez votre bouteille personnalisée en 3D : capacité, matière, couleurs, marquage et quantité.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,6 +35,9 @@
         <div class="viewer-hud top">
           <div class="spec" id="specLine"></div>
           <div class="hud-actions">
+            <button class="icon-btn" id="handleBtn" title="Rabattre l'anse" aria-pressed="false">
+              <svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3" /><rect x="5" y="11" width="14" height="4" rx="1.5" /><path d="M8 15v5h8v-5" /></svg>
+            </button>
             <button class="icon-btn" id="guidesBtn" title="Afficher la zone d'impression" aria-pressed="false">
               <svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /><path d="M12 9v6M9 12h6" /></svg>
             </button>

@@ -41,7 +41,7 @@ H.location = (0, 0, zp)
 H.rotation_mode = 'XYZ'
 act = bpy.data.actions.new('HANDLE_UP_DOWN')
 H.animation_data_create(); H.animation_data.action = act
-for f, ang in ((1, 0.0), (24, 90.0)):
+for f, ang in ((1, 0.0), (24, -90.0)):  # rotation négative autour de X : l'anse bascule vers l'arrière (+Y Blender)
     H.rotation_euler = (math.radians(ang), 0, 0); H.keyframe_insert('rotation_euler', index=0, frame=f)
 H.rotation_euler = (0, 0, 0)
 s.frame_set(1)
@@ -166,6 +166,9 @@ def shoot(camname, fname, res=(1200, 1600), frame=1):
     s.camera = bpy.data.objects[camname]; s.frame_set(frame); rset(res)
     s.render.filepath = os.path.join(REN, fname); bpy.ops.render.render(write_still=True)
 
+ONLY = next((a.split('=')[1] for a in sys.argv if a.startswith('--only=')), None)
+if ONLY == 'handle_down':
+    shoot('CAM_3Q_RIGHT', 'handle_down.png', frame=24)
 if '--test' in sys.argv:
     shoot('CAM_REFERENCE', 'test_ref.png', res=(450, 600)); shoot('CAM_DETAIL_CAP', 'test_cap.png', res=(450, 600)); sys.exit(0)
 if '--render' in sys.argv:

@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 const ENGRAVE = {
   coated: { color: '#c9cac7', metalness: 0.95, roughness: 0.32 }, // peinture retirée → inox apparent
@@ -46,8 +48,8 @@ export class BottleViewer {
     this.materials = {
       body: new THREE.MeshPhysicalMaterial({ color: '#ffffff' }),
       cap: new THREE.MeshPhysicalMaterial({ color: '#c8102e', roughness: 0.45, clearcoat: 0.3 }),
-      loop: new THREE.MeshPhysicalMaterial({ color: '#c8102e', roughness: 0.5 }),
-      inner: new THREE.MeshStandardMaterial({ color: '#9c9d9a', metalness: 1, roughness: 0.4 }),
+      handle: new THREE.MeshPhysicalMaterial({ color: '#c8102e', roughness: 0.42, clearcoat: 0.2 }),
+      ring: new THREE.MeshPhysicalMaterial({ color: '#e6e6e3', metalness: 1, roughness: 0.1 }),
     };
     this.colorTargets = {};
 
@@ -112,80 +114,48 @@ export class BottleViewer {
     this.scene.add(this.contact);
   }
 
-  // ---------- Géométrie ----------
-  build(size, artwork) {
-    const g = size.geometry;
-    this.dim = g;
-    this.zone = size.printZone;
-    const old = [...this.group.children];
-    old.forEach((o) => { this.group.remove(o); o.geometry?.dispose(); });
+  // ---------- Géométrie : master 3D validé (bottle-master/) ----------
+  async loadMaster(url) {
+    if (this.masterScene) return this.masterScene;
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/');
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(draco);
+    const gltf = await loader.loadAsync(url);
+    this.masterScene = gltf.scene;
+    return this.masterScene;
+  }
 
-    const bodyH = g.height - g.capHeight + 0.6;
-    this.bodyH = bodyH;
-    const R = g.radius;
-    const rn = g.neckRadius;
-    const s = g.shoulderStart * bodyH;
+  async build(size, product, artwork) {
+    const S = product.scale.sceneUnitsPerBodyHeight;
+    const M = product.master;
+    const root = await this.loadMaster(M.model);
+    this.group.clear();
+    const model = root.clone(true);
+    model.scale.setScalar(S);
+    const partOf = {};
+    for (const [part, names] of Object.entries(M.parts)) names.forEach((n) => { partOf[n] = part; });
+    model.traverse((o) => {
+      if (/^PRINT_/.test(o.name)) { o.visible = false; return; }
+      if (!o.isMesh) return;
+      const part = partOf[o.name] || partOf[o.parent?.name];
+      if (part) o.material = this.materials[part];
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
+    this.handleNode = model.getObjectByName(M.handleNode);
+    this.handleFold = THREE.MathUtils.degToRad(M.handleFoldDeg);
+    this.handleTarget = this.handleTarget || 0;
+    this.group.add(model);
+    this.body = model.getObjectByName('BODY');
 
-    const pts = [];
-    const P = (x, y) => pts.push(new THREE.Vector2(x, y));
-    P(0, 0.05); P(R * 0.55, 0.05); P(R - 0.35, 0.08); P(R - 0.12, 0.2); P(R - 0.02, 0.45); P(R, 0.8);
-    P(R, s);
-    const neckY = bodyH - 1.1;
-    const curve = new THREE.CubicBezierCurve(
-      new THREE.Vector2(R, s),
-      new THREE.Vector2(R, s + (neckY - s) * 0.62),
-      new THREE.Vector2(rn + 0.15, neckY - (neckY - s) * 0.18),
-      new THREE.Vector2(rn, neckY),
-    );
-    curve.getPoints(28).slice(1).forEach((p) => P(p.x, p.y));
-    P(rn, bodyH - 0.12); P(rn - 0.1, bodyH); P(rn - 0.35, bodyH); P(rn - 0.35, bodyH - 1.5);
+    const R = M.bodyRadius * S;
+    this.dim = { height: M.totalHeight * S, radius: R };
+    this.zone = { bottom: size.printZone.bottom * S, top: size.printZone.top * S };
 
-    const body = new THREE.Mesh(new THREE.LatheGeometry(pts, 160), this.materials.body);
-    body.castShadow = true;
-    body.receiveShadow = true;
-    body.name = 'body';
-    this.group.add(body);
-
-    // bouchon
-    const capBase = bodyH - 1.6;
-    const capTop = capBase + g.capHeight;
-    const rc = rn + 0.42;
-    const cp = [];
-    const C = (x, y) => cp.push(new THREE.Vector2(x, y));
-    C(rn - 0.2, capBase + 0.3); C(rn, capBase); C(rc - 0.12, capBase); C(rc, capBase + 0.14);
-    C(rc, capTop - 0.55); C(rc - 0.08, capTop - 0.2); C(rc - 0.35, capTop - 0.02); C(0, capTop);
-    const capGeo = new THREE.LatheGeometry(cp, 120);
-    const cap = new THREE.Mesh(capGeo, this.materials.cap);
-    cap.castShadow = true;
-    cap.name = 'cap';
-    this.group.add(cap);
-
-    // stries de préhension
-    const ribs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, g.capHeight * 0.62, 0.14), this.materials.cap, 48);
-    const m = new THREE.Matrix4();
-    for (let i = 0; i < 48; i++) {
-      const a = (i / 48) * Math.PI * 2;
-      m.makeRotationY(a).setPosition(Math.sin(a) * rc, capBase + g.capHeight * 0.42, Math.cos(a) * rc);
-      ribs.setMatrixAt(i, m);
-    }
-    ribs.castShadow = true;
-    ribs.name = 'cap';
-    this.group.add(ribs);
-
-    // anse
-    const loop = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.34, 24, 64, Math.PI), this.materials.loop);
-    loop.position.y = capTop - 0.25;
-    loop.castShadow = true;
-    loop.name = 'loop';
-    this.group.add(loop);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.8, 0.35, 64), this.materials.loop);
-    hub.position.y = capTop - 0.05;
-    hub.name = 'loop';
-    this.group.add(hub);
-
-    // manchon d'impression
+    // manchon d'impression : épouse la partie droite du corps (zone imprimable du master)
     const zh = this.zone.top - this.zone.bottom;
-    const sleeveGeo = new THREE.CylinderGeometry(R + 0.015, R + 0.015, zh, 256, 1, true, Math.PI, Math.PI * 2);
+    const sleeveGeo = new THREE.CylinderGeometry(R + 0.012, R + 0.012, zh, 256, 1, true, Math.PI, Math.PI * 2);
     this.sleeve = new THREE.Mesh(sleeveGeo, new THREE.MeshPhysicalMaterial({ transparent: true, depthWrite: false }));
     this.sleeve.position.y = this.zone.bottom + zh / 2;
     this.sleeve.renderOrder = 2;
@@ -193,7 +163,7 @@ export class BottleViewer {
     this.group.add(this.sleeve);
 
     this.guides = new THREE.Mesh(
-      new THREE.CylinderGeometry(R + 0.03, R + 0.03, zh, 256, 1, true, Math.PI, Math.PI * 2),
+      new THREE.CylinderGeometry(R + 0.025, R + 0.025, zh, 256, 1, true, Math.PI, Math.PI * 2),
       new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false }),
     );
     this.guides.position.copy(this.sleeve.position);
@@ -202,12 +172,11 @@ export class BottleViewer {
     this.group.add(this.guides);
 
     this.contact.scale.set(R * 4.2, R * 4.2, 1);
-
-    this.circumference = 2 * Math.PI * R;
-    this.patternHeight = zh;
     this.bindArtwork(artwork);
     this.intro = 1;
   }
+
+  setHandleDown(down) { this.handleTarget = down ? 1 : 0; }
 
   bindArtwork(artwork) {
     this.artwork = artwork;
@@ -251,13 +220,17 @@ export class BottleViewer {
     b.bumpScale = 0.4;
     b.side = fin.transmission ? THREE.DoubleSide : THREE.FrontSide;
     b.needsUpdate = true;
-    this.body = this.group.getObjectByName('body');
+    this.body = this.group.getObjectByName('BODY');
     if (this.body) this.body.castShadow = !fin.transmission;
 
     const bodyColor = fin.colorable === false ? fin.fixedColor : cfg.colors.body;
     this.colorTargets.body = new THREE.Color(bodyColor);
     this.colorTargets.cap = new THREE.Color(cfg.colors.cap);
-    this.colorTargets.loop = new THREE.Color(cfg.colors.loop);
+    this.colorTargets.handle = new THREE.Color(cfg.colors.handle);
+    const rf = product.ringFinishes.find((f) => f.id === cfg.colors.ring) || product.ringFinishes[0];
+    this.colorTargets.ring = new THREE.Color(rf.color);
+    this.materials.ring.metalness = rf.metalness;
+    this.materials.ring.roughness = rf.roughness;
 
     // marquage
     const method = product.printingMethods.find((m) => m.id === cfg.method);
@@ -305,6 +278,7 @@ export class BottleViewer {
       top:    { pos: [0.01, h + d * 0.8, d * 0.35], target: [0, h * 0.55, 0] },
       detail: { pos: [d * 0.22, zc + 2, d * 0.46], target: [0, zc, 0] },
       hero:   { pos: [-d * 0.42, cy + 7, d * 0.9], target: [0, cy, 0] },
+      cap:    { pos: [d * 0.2, h * 0.86, d * 0.36], target: [0, h * 0.8, 0] },
     };
   }
 
@@ -402,9 +376,14 @@ export class BottleViewer {
   tick() {
     const dt = Math.min(this.clock.getDelta(), 0.1);
     const k = 1 - Math.exp(-dt / 0.09); // ~300 ms
-    for (const key of ['body', 'cap', 'loop']) {
+    for (const key of ['body', 'cap', 'handle', 'ring']) {
       const t = this.colorTargets[key];
       if (t) this.materials[key].color.lerp(t, k);
+    }
+    if (this.handleNode) {
+      const cur = this.handleNode.rotation.x / (this.handleFold || -Math.PI / 2);
+      const next = cur + (this.handleTarget - cur) * (1 - Math.exp(-dt / 0.12));
+      this.handleNode.rotation.x = next * this.handleFold;
     }
     if (this.camAnim) {
       const a = this.camAnim;

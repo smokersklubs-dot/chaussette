@@ -21,7 +21,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const isMobile = () => matchMedia('(max-width: 860px)').matches;
 
 const STEPS = [
-  { id: 'size',     label: 'Capacité', sub: 'Chaque capacité a ses propres proportions.' },
+  { id: 'size',     label: 'Capacité', sub: 'Format du master 3D, reconstruit sur la référence.' },
   { id: 'material', label: 'Matière',  sub: 'La matière et la finition changent le rendu réel.' },
   { id: 'colors',   label: 'Couleurs', sub: 'Corps, bouchon et anse se règlent séparément.' },
   { id: 'marking',  label: 'Marquage', sub: 'Technique, zone et visuel. Glissez le logo sur la bouteille.' },
@@ -52,7 +52,7 @@ async function init() {
     material: product.defaultMaterial,
     finish: null,
     colors: { ...product.colors.defaults },
-    colorRefs: { body: '', cap: '', loop: '' },
+    colorRefs: { body: '', cap: '', handle: '' },
     method: 'uv',
     zone: 'front',
     quantity: product.quantity.default,
@@ -65,9 +65,14 @@ async function init() {
   $('#reviewTitle').textContent = product.name;
 
   viewer = new BottleViewer($('#viewer'));
+  $('#handleBtn').addEventListener('click', (e) => {
+    const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+    viewer.setHandleDown(on);
+  });
   viewer.onView = (name) => $('#views').querySelectorAll('button').forEach((x) => x.classList.toggle('is-active', x.dataset.view === name));
   artwork.onChange = onArtworkChange;
-  rebuildModel();
+  await rebuildModel();
   viewer.goTo('hero', true);
   setTimeout(() => viewer.goTo('front'), 250);
   $('#loading').classList.add('hidden');
@@ -80,14 +85,25 @@ async function init() {
 }
 
 // ---------- Modèle ----------
+function zoneWidth() { return artwork.pattern.circumference * (artwork.zone?.widthRatio || 1); }
+function ringLabel() { return product.ringFinishes.find((f) => f.id === cfg.colors.ring)?.label || '—'; }
 function currentSize() { return product.sizes.find((s) => s.id === cfg.size); }
 
-function rebuildModel() {
+const SCALE = () => product.scale.sceneUnitsPerBodyHeight;
+// Longueur affichée : mm si l'échelle usine est connue, sinon % de la zone imprimable
+function fmtLen(units, ref) {
+  const mm = product.scale.mmPerBodyHeight;
+  if (typeof mm === 'number') return `${Math.round((units / SCALE()) * mm)} mm`;
+  return `${Math.round((units / ref) * 100)} %`;
+}
+
+async function rebuildModel() {
   const size = currentSize();
-  const r = size.geometry.radius;
-  artwork.setPattern(2 * Math.PI * r, size.printZone.top - size.printZone.bottom, product.safeMarginCm);
+  const S = SCALE();
+  const r = product.master.bodyRadius * S;
+  artwork.setPattern(2 * Math.PI * r, (size.printZone.top - size.printZone.bottom) * S, product.safeMargin * S);
   artwork.setZone(product.printZones.find((z) => z.id === cfg.zone));
-  viewer.build(size, artwork);
+  await viewer.build(size, product, artwork);
   viewer.applyConfig(cfg, product);
   artwork.render();
 }
@@ -123,7 +139,7 @@ function renderSpec() {
     size.label,
     labelOf(product.materials, cfg.material),
     product.finishes[cfg.finish].label,
-    `Ø ${(size.geometry.radius * 2 * 10).toFixed(0)} × ${(size.geometry.height * 10).toFixed(0)} mm`,
+    typeof product.scale.mmPerBodyHeight === 'number' ? `H ${Math.round(product.master.totalHeight * product.scale.mmPerBodyHeight)} mm` : 'Cotes à confirmer',
   ].map((t) => `<span>${esc(t)}</span>`).join('');
 }
 
@@ -131,7 +147,7 @@ function renderSummary() {
   const items = [
     ['Capacité', currentSize().label],
     ['Matière', labelOf(product.materials, cfg.material)],
-    ['Couleurs', ['body', 'cap', 'loop'].map((c) => `<i style="background:${c === 'body' ? bodyColorShown() : cfg.colors[c]}"></i>`).join('')],
+    ['Couleurs', ['body', 'cap', 'handle'].map((c) => `<i style="background:${c === 'body' ? bodyColorShown() : cfg.colors[c]}"></i>`).join('')],
     ['Marquage', methodLabel()],
     ['Quantité', `${fmtInt(cfg.quantity)} pcs`],
   ];
@@ -219,7 +235,7 @@ function renderStep(back = false) {
   $('#prevBtn').disabled = step === 0;
   $('#nextBtn').textContent = step === STEPS.length - 2 ? 'Voir le récapitulatif' : 'Continuer';
   if (s.id === 'marking') viewer.goTo(cfg.zone === 'back' ? 'back' : 'front');
-  if (s.id === 'colors' && activeComponent !== 'body') viewer.goTo('top');
+  if (s.id === 'colors' && activeComponent !== 'body') viewer.goTo('cap');
 }
 
 function group(label, extra = '') {
@@ -233,16 +249,15 @@ function stepSize(body) {
   const g = group('Capacité');
   const opts = el('div', { class: 'options' });
   product.sizes.forEach((s) => {
-    const gm = s.geometry;
     opts.append(el('button', {
       class: `opt ${cfg.size === s.id ? 'is-active' : ''}`,
       onclick: () => { cfg.size = s.id; update({ model: true }); renderStep(); },
     }, `<div class="t">${esc(s.label)}${flag(s.confirmed)}</div>
-        <span class="k">Ø ${(gm.radius * 20).toFixed(0)} mm · H ${(gm.height * 10).toFixed(0)} mm · zone ${((s.printZone.top - s.printZone.bottom) * 10).toFixed(0)} mm</span>`));
+        <span class="k">Capacité : à confirmer usine · master 3D validé sur la référence</span>`));
   });
   g.append(opts);
   body.append(g);
-  body.append(el('p', { class: 'note' }, 'Dimensions de modélisation. Cotes et capacités exactes à confirmer avec l\'usine.'));
+  body.append(el('p', { class: 'note' }, 'Forme reconstruite au pixel près sur la photo de référence. Capacité, cotes et autres formats : à confirmer avec l\'usine.'));
 }
 
 function stepMaterial(body) {
@@ -276,14 +291,26 @@ function stepMaterial(body) {
 function stepColors(body) {
   const tabs = el('div', { class: 'tabs', role: 'tablist' });
   product.components.forEach((c) => {
-    const color = c.id === 'body' ? bodyColorShown() : cfg.colors[c.id];
+    const color = c.id === 'body' ? bodyColorShown() : c.id === 'ring' ? (product.ringFinishes.find((f) => f.id === cfg.colors.ring)?.color || '#ccc') : cfg.colors[c.id];
     tabs.append(el('button', {
       class: activeComponent === c.id ? 'is-active' : '', role: 'tab', 'aria-selected': activeComponent === c.id ? 'true' : 'false',
-      onclick: () => { activeComponent = c.id; renderStep(); viewer.goTo(c.id === 'body' ? 'front' : 'top'); },
+      onclick: () => { activeComponent = c.id; renderStep(); viewer.goTo(c.id === 'body' ? 'front' : 'cap'); },
     }, `<span class="dot" style="background:${color}"></span>${esc(c.label)}`));
   });
   body.append(tabs);
 
+  if (activeComponent === 'ring') {
+    const rg = group('Finition de la bague', `<b>${esc(ringLabel())}</b>`);
+    const chips = el('div', { class: 'chips' });
+    product.ringFinishes.forEach((f) => chips.append(el('button', {
+      class: `chip ${cfg.colors.ring === f.id ? 'is-active' : ''}`,
+      onclick: () => { cfg.colors.ring = f.id; update(); renderStep(); viewer.goTo('cap'); },
+    }, `${esc(f.label)}${f.confirmed === false ? ' <span class="flag">à confirmer</span>' : ''}`)));
+    rg.append(chips);
+    body.append(rg);
+    body.append(el('p', { class: 'note' }, 'La bague métallique sépare le corps du bouchon. Inox poli : finition visible sur la référence.'));
+    return;
+  }
   const locked = activeComponent === 'body' && product.finishes[cfg.finish].colorable === false;
   const g = group(`Couleur ${labelOf(product.components, activeComponent).toLowerCase()}`, `<b>${esc(currentColorName())}</b>`);
   if (locked) {
@@ -411,11 +438,11 @@ function stepMarking(body) {
   patternCanvas.height = Math.round((cw * artwork.pattern.height) / artwork.pattern.circumference);
   wrap.append(patternCanvas);
   pg.append(wrap);
-  pg.append(el('div', { class: 'pattern-cap' }, `<span>${(artwork.pattern.circumference * 10).toFixed(0)} mm (360°)</span><span>H ${(artwork.pattern.height * 10).toFixed(0)} mm</span>`));
+  pg.append(el('div', { class: 'pattern-cap' }, `<span>360° · déroulé du corps</span><span>${typeof product.scale.mmPerBodyHeight === 'number' ? fmtLen(artwork.pattern.circumference) : 'cotes à confirmer'}</span>`));
   bindPatternDrag(patternCanvas);
 
   if (artwork.image) {
-    pg.append(slider('Taille', 'size', 0.5, artwork.maxWidth(), 0.1, artwork.t.width, (v) => `${(v * 10).toFixed(0)} mm`, (v) => { artwork.t.width = v; }));
+    pg.append(slider('Taille', 'size', 0.5, artwork.maxWidth(), 0.1, artwork.t.width, (v) => fmtLen(v, zoneWidth()), (v) => { artwork.t.width = v; }));
     pg.append(slider('Rotation', 'rot', -180, 180, 1, artwork.t.rotation, (v) => `${Math.round(v)}°`, (v) => { artwork.t.rotation = v; }));
     const acts = el('div', { class: 'mini-actions' });
     acts.append(
@@ -553,9 +580,10 @@ function enterReview() {
     ['Matière', `${esc(labelOf(product.materials, cfg.material))} · ${esc(product.finishes[cfg.finish].label)}`],
     ['Corps', `${esc(bodyColorShown().toUpperCase())}${ref('body')}${dot(bodyColorShown())}`],
     ['Bouchon', `${esc(cfg.colors.cap.toUpperCase())}${ref('cap')}${dot(cfg.colors.cap)}`],
-    ['Anse', `${esc(cfg.colors.loop.toUpperCase())}${ref('loop')}${dot(cfg.colors.loop)}`],
+    ['Anse', `${esc(cfg.colors.handle.toUpperCase())}${ref('handle')}${dot(cfg.colors.handle)}`],
+    ['Bague', esc(ringLabel())],
     ['Marquage', cfg.hasArtwork ? `${esc(methodLabel())} · ${esc(labelOf(product.printZones, cfg.zone))}` : 'Sans marquage'],
-    ['Visuel', cfg.hasArtwork ? `${esc(artwork.name)} · ${(artwork.t.width * 10).toFixed(0)} mm` : '—'],
+    ['Visuel', cfg.hasArtwork ? `${esc(artwork.name)} · ${fmtLen(artwork.t.width, zoneWidth())}` : '—'],
     ['Quantité', `${fmtInt(cfg.quantity)} pcs`],
   ];
   $('#reviewList').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
@@ -566,7 +594,7 @@ function enterReview() {
   $('#sendBtn').textContent = p.status === 'factory' ? 'Envoyer à SKLUBS' : 'Demander le devis';
   viewer.setGuides(false);
   $('#guidesBtn').setAttribute('aria-pressed', 'false');
-  if (isMobile()) viewer.setFrameShift(0.3);
+  if (isMobile()) viewer.setFrameShift(0.24);
   viewer.goTo('hero');
   setTimeout(() => { viewer.setAutoRotate(true); $('#rotateBtn').setAttribute('aria-pressed', 'true'); }, 900);
 }
@@ -589,10 +617,15 @@ function buildProject() {
     variant_id: `${product.id}-${size.id}`,
     size: size.id,
     materials: { material: cfg.material, finish: cfg.finish },
-    colors: { body: bodyColorShown(), cap: cfg.colors.cap, loop: cfg.colors.loop },
+    colors: { body: bodyColorShown(), cap: cfg.colors.cap, handle: cfg.colors.handle, ring: cfg.colors.ring },
     color_refs: cfg.colorRefs,
     artwork: artwork.image ? { file: artwork.name, data_url: artwork.image.toDataURL('image/png') } : null,
-    artwork_transform: artwork.image ? { x_mm: +(artwork.t.x * 10).toFixed(1), y_mm: +(artwork.t.y * 10).toFixed(1), width_mm: +(artwork.t.width * 10).toFixed(1), rotation_deg: artwork.t.rotation } : null,
+    artwork_transform: artwork.image ? {
+      units: 'BODY_HEIGHT', x: +(artwork.t.x / SCALE()).toFixed(4), y: +(artwork.t.y / SCALE()).toFixed(4), width: +(artwork.t.width / SCALE()).toFixed(4),
+      width_pct_zone: Math.round((artwork.t.width / zoneWidth()) * 100), rotation_deg: artwork.t.rotation,
+      mm: typeof product.scale.mmPerBodyHeight === 'number' ? { x: (artwork.t.x / SCALE()) * product.scale.mmPerBodyHeight, y: (artwork.t.y / SCALE()) * product.scale.mmPerBodyHeight, width: (artwork.t.width / SCALE()) * product.scale.mmPerBodyHeight } : 'TO_DEFINE_FACTORY',
+    } : null,
+    model: product.master.model,
     printing_method: cfg.hasArtwork ? cfg.method : null,
     print_zones: cfg.hasArtwork ? [cfg.zone] : [],
     quantity: cfg.quantity,

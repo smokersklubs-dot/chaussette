@@ -5,7 +5,6 @@
   "subtitle": "Cas test n°1 — devis 2026 Cricket Merchandising",
   "status": "draft",
   "_note": "Toute valeur à null ou marquée TO_DEFINE doit être confirmée par SKLUBS / l'usine. Le configurateur affiche alors « Validation usine requise » au lieu d'un faux prix.",
-
   "reference": {
     "source": "2026_CRICKET_MERCHANDISING_QUOTE",
     "quantity": 200,
@@ -14,104 +13,320 @@
     "material": "TO_DEFINE",
     "unitPrice": "TO_DEFINE"
   },
-
   "sizes": [
-    { "id": "500", "label": "500 ml", "confirmed": false,
-      "geometry": { "height": 23.0, "radius": 3.55, "neckRadius": 2.35, "shoulderStart": 0.72, "capHeight": 3.6 },
-      "printZone": { "bottom": 2.2, "top": 13.8 } },
-    { "id": "750", "label": "750 ml", "confirmed": false,
-      "geometry": { "height": 27.0, "radius": 3.8, "neckRadius": 2.4, "shoulderStart": 0.74, "capHeight": 3.8 },
-      "printZone": { "bottom": 2.4, "top": 17.0 } }
+    {
+      "id": "master",
+      "label": "Bouteille isotherme",
+      "capacity": "TO_DEFINE_FACTORY",
+      "confirmed": false,
+      "printZone": {
+        "bottom": 0.08,
+        "top": 0.78
+      }
+    }
   ],
-  "defaultSize": "500",
-
+  "defaultSize": "master",
   "components": [
-    { "id": "body", "label": "Corps" },
-    { "id": "cap",  "label": "Bouchon" },
-    { "id": "loop", "label": "Anse" }
+    {
+      "id": "body",
+      "label": "Corps"
+    },
+    {
+      "id": "cap",
+      "label": "Bouchon"
+    },
+    {
+      "id": "handle",
+      "label": "Anse"
+    },
+    {
+      "id": "ring",
+      "label": "Bague"
+    }
   ],
-
   "materials": [
-    { "id": "steel", "label": "Inox double paroi", "confirmed": false,
-      "finishes": ["matte", "gloss", "softtouch", "brushed"], "defaultFinish": "matte" },
-    { "id": "aluminium", "label": "Aluminium", "confirmed": false,
-      "finishes": ["matte", "gloss", "metallic"], "defaultFinish": "gloss" },
-    { "id": "tritan", "label": "Tritan (sans BPA)", "confirmed": false,
-      "finishes": ["transparent", "frosted"], "defaultFinish": "frosted" }
+    {
+      "id": "steel",
+      "label": "Inox double paroi",
+      "confirmed": false,
+      "finishes": [
+        "matte",
+        "gloss",
+        "softtouch",
+        "brushed"
+      ],
+      "defaultFinish": "matte"
+    }
   ],
   "defaultMaterial": "steel",
-
   "finishes": {
-    "matte":       { "label": "Mat (peinture poudre)", "roughness": 0.62, "metalness": 0.0, "clearcoat": 0.0, "colorable": true },
-    "gloss":       { "label": "Brillant",              "roughness": 0.16, "metalness": 0.0, "clearcoat": 1.0, "clearcoatRoughness": 0.06, "colorable": true },
-    "softtouch":   { "label": "Soft touch",            "roughness": 0.85, "metalness": 0.0, "clearcoat": 0.0, "sheen": 0.4, "colorable": true },
-    "brushed":     { "label": "Inox brossé naturel",   "roughness": 0.34, "metalness": 1.0, "clearcoat": 0.0, "brushed": true, "colorable": false, "fixedColor": "#c8c9c7" },
-    "metallic":    { "label": "Métallisé",             "roughness": 0.28, "metalness": 0.75, "clearcoat": 0.6, "colorable": true },
-    "transparent": { "label": "Transparent",           "roughness": 0.04, "metalness": 0.0, "transmission": 1.0, "ior": 1.54, "thickness": 0.35, "colorable": true },
-    "frosted":     { "label": "Givré",                 "roughness": 0.55, "metalness": 0.0, "transmission": 0.9, "ior": 1.54, "thickness": 0.35, "colorable": true }
+    "matte": {
+      "label": "Mat (peinture poudre)",
+      "roughness": 0.62,
+      "metalness": 0.0,
+      "clearcoat": 0.0,
+      "colorable": true
+    },
+    "gloss": {
+      "label": "Brillant",
+      "roughness": 0.16,
+      "metalness": 0.0,
+      "clearcoat": 1.0,
+      "clearcoatRoughness": 0.06,
+      "colorable": true
+    },
+    "softtouch": {
+      "label": "Soft touch",
+      "roughness": 0.85,
+      "metalness": 0.0,
+      "clearcoat": 0.0,
+      "sheen": 0.4,
+      "colorable": true
+    },
+    "brushed": {
+      "label": "Inox brossé naturel",
+      "roughness": 0.34,
+      "metalness": 1.0,
+      "clearcoat": 0.0,
+      "brushed": true,
+      "colorable": false,
+      "fixedColor": "#c8c9c7"
+    }
   },
-
   "colors": {
-    "_note": "Nuancier catalogue à confirmer avec l'usine.",
+    "_note": "Blanc et rouge : visuel Cricket. Les six autres : teintes échantillonnées sur la référence du master. Nuancier usine à confirmer.",
     "catalog": [
-      { "id": "white", "label": "Blanc",    "hex": "#F4F4F1" },
-      { "id": "red",   "label": "Rouge",    "hex": "#C8102E" },
-      { "id": "black", "label": "Noir",     "hex": "#1B1B1B" },
-      { "id": "navy",  "label": "Marine",   "hex": "#1F2A44" },
-      { "id": "sage",  "label": "Sauge",    "hex": "#9CAF95" },
-      { "id": "sand",  "label": "Sable",    "hex": "#D8CCB6" },
-      { "id": "orange","label": "Orange",   "hex": "#FF6B00" }
+      {
+        "id": "white",
+        "label": "Blanc",
+        "hex": "#F4F4F1"
+      },
+      {
+        "id": "red",
+        "label": "Rouge",
+        "hex": "#C8102E"
+      },
+      {
+        "id": "black",
+        "label": "Noir",
+        "hex": "#171717"
+      },
+      {
+        "id": "yellow",
+        "label": "Jaune",
+        "hex": "#CFB40B"
+      },
+      {
+        "id": "lightblue",
+        "label": "Bleu clair",
+        "hex": "#78BEE1"
+      },
+      {
+        "id": "orange",
+        "label": "Orange",
+        "hex": "#D14A14"
+      },
+      {
+        "id": "olive",
+        "label": "Vert olive",
+        "hex": "#404330"
+      },
+      {
+        "id": "pink",
+        "label": "Rose",
+        "hex": "#ED899F"
+      }
     ],
-    "defaults": { "body": "#F4F4F1", "cap": "#C8102E", "loop": "#C8102E" }
+    "defaults": {
+      "body": "#F4F4F1",
+      "cap": "#C8102E",
+      "handle": "#C8102E",
+      "ring": "polished"
+    }
   },
-
   "printZones": [
-    { "id": "front", "label": "Face",     "widthRatio": 0.36, "centerU": 0.5 },
-    { "id": "back",  "label": "Dos",      "widthRatio": 0.36, "centerU": 0.0 },
-    { "id": "wrap",  "label": "Wrap 360°", "widthRatio": 1.0,  "centerU": 0.5 }
+    {
+      "id": "front",
+      "label": "Face",
+      "widthRatio": 0.36,
+      "centerU": 0.5
+    },
+    {
+      "id": "back",
+      "label": "Dos",
+      "widthRatio": 0.36,
+      "centerU": 0.0
+    },
+    {
+      "id": "wrap",
+      "label": "Wrap 360°",
+      "widthRatio": 1.0,
+      "centerU": 0.5
+    }
   ],
-  "safeMarginCm": 0.4,
-
   "printingMethods": [
-    { "id": "laser",  "label": "Gravure laser",   "render": "engrave", "maxColors": 1 },
-    { "id": "uv",     "label": "Impression UV",   "render": "print",   "maxColors": null },
-    { "id": "screen", "label": "Sérigraphie",     "render": "print",   "maxColors": "TO_DEFINE" },
-    { "id": "pad",    "label": "Tampographie",    "render": "print",   "maxColors": "TO_DEFINE" },
-    { "id": "wrap360", "label": "Impression 360°", "render": "print",  "maxColors": null }
+    {
+      "id": "laser",
+      "label": "Gravure laser",
+      "render": "engrave",
+      "maxColors": 1
+    },
+    {
+      "id": "uv",
+      "label": "Impression UV",
+      "render": "print",
+      "maxColors": null
+    },
+    {
+      "id": "screen",
+      "label": "Sérigraphie",
+      "render": "print",
+      "maxColors": "TO_DEFINE"
+    },
+    {
+      "id": "pad",
+      "label": "Tampographie",
+      "render": "print",
+      "maxColors": "TO_DEFINE"
+    },
+    {
+      "id": "wrap360",
+      "label": "Impression 360°",
+      "render": "print",
+      "maxColors": null
+    }
   ],
-
   "rules": {
     "_status": "TO_DEFINE — brouillon technique à valider usine",
     "methodsByMaterial": {
-      "steel":     ["laser", "uv", "screen", "pad", "wrap360"],
-      "aluminium": ["laser", "uv", "screen", "pad"],
-      "tritan":    ["uv", "screen", "pad"]
+      "steel": [
+        "laser",
+        "uv",
+        "screen",
+        "pad",
+        "wrap360"
+      ]
     },
     "zonesByMethod": {
-      "laser":   ["front", "back", "wrap"],
-      "uv":      ["front", "back", "wrap"],
-      "screen":  ["front", "back"],
-      "pad":     ["front", "back"],
-      "wrap360": ["wrap"]
+      "laser": [
+        "front",
+        "back",
+        "wrap"
+      ],
+      "uv": [
+        "front",
+        "back",
+        "wrap"
+      ],
+      "screen": [
+        "front",
+        "back"
+      ],
+      "pad": [
+        "front",
+        "back"
+      ],
+      "wrap360": [
+        "wrap"
+      ]
     }
   },
-
   "quantity": {
     "moq": "TO_DEFINE",
     "default": 200,
-    "presets": [100, 200, 500, 1000, 2500]
+    "presets": [
+      100,
+      200,
+      500,
+      1000,
+      2500
+    ]
   },
-
   "pricing": {
     "_status": "TO_DEFINE — aucun prix n'est inventé. Remplir ces champs active le calcul instantané.",
     "currency": "EUR",
-    "basePriceBySize": { "500": null, "750": null },
-    "materialSurcharge": { "steel": null, "aluminium": null, "tritan": null },
-    "finishSurcharge": { "matte": null, "gloss": null, "softtouch": null, "brushed": null, "metallic": null, "transparent": null, "frosted": null },
-    "methodUnitPrice": { "laser": null, "uv": null, "screen": null, "pad": null, "wrap360": null },
+    "basePriceBySize": {
+      "master": null
+    },
+    "materialSurcharge": {
+      "steel": null
+    },
+    "finishSurcharge": {
+      "matte": null,
+      "gloss": null,
+      "softtouch": null,
+      "brushed": null
+    },
+    "methodUnitPrice": {
+      "laser": null,
+      "uv": null,
+      "screen": null,
+      "pad": null,
+      "wrap360": null
+    },
     "extraZoneUnitPrice": null,
-    "setupFee": { "laser": null, "uv": null, "screen": null, "pad": null, "wrap360": null },
+    "setupFee": {
+      "laser": null,
+      "uv": null,
+      "screen": null,
+      "pad": null,
+      "wrap360": null
+    },
     "quantityDiscounts": null,
-    "priceMode": "instant"
-  }
+    "priceMode": "instant",
+    "ringSurcharge": {
+      "polished": null,
+      "black": null
+    }
+  },
+  "master": {
+    "model": "bottle-master/export/SKLUBS_BOTTLE_WEB.glb",
+    "source": "bottle-master/ (reconstruction contrainte, validée par calque)",
+    "units": "BODY_HEIGHT = 1 (fond -> bas de la bague)",
+    "bodyRadius": 0.1963,
+    "totalHeight": 1.386,
+    "parts": {
+      "body": [
+        "BODY",
+        "NECK"
+      ],
+      "cap": [
+        "CAP"
+      ],
+      "handle": [
+        "HANDLE",
+        "HINGE_L",
+        "HINGE_R"
+      ],
+      "ring": [
+        "METAL_RING"
+      ]
+    },
+    "handleNode": "HANDLE",
+    "handleFoldDeg": -90
+  },
+  "scale": {
+    "sceneUnitsPerBodyHeight": 20,
+    "mmPerBodyHeight": "TO_DEFINE_FACTORY",
+    "_note": "Tant que la cote usine est inconnue, les tailles s'affichent en % de la zone imprimable."
+  },
+  "ringFinishes": [
+    {
+      "id": "polished",
+      "label": "Inox poli",
+      "color": "#E6E6E3",
+      "metalness": 1.0,
+      "roughness": 0.1
+    },
+    {
+      "id": "black",
+      "label": "Métal noir",
+      "color": "#1C1C1C",
+      "metalness": 0.85,
+      "roughness": 0.32,
+      "confirmed": false
+    }
+  ],
+  "_unavailable": "Aluminium, Tritan, verre et autres capacités : pas de master 3D ni de donnée usine pour ce modèle. TO_DEFINE_FACTORY.",
+  "safeMargin": 0.015
 }

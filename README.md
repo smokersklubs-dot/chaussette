@@ -6,6 +6,10 @@ Configurateur 3D d'une bouteille personnalisée. Produit unique : **Bouteille Cr
 Site statique : HTML + CSS + JavaScript (modules ES) + Three.js 0.170 chargé par CDN.
 Aucune étape de build.
 
+Le modèle 3D affiché est le **master reconstruit et validé par calque** sur la photo de référence
+(`bottle-master/`, voir son README). Le configurateur charge `bottle-master/export/SKLUBS_BOTTLE_WEB.glb`
+(compression Draco, décodeur chargé depuis le CDN de Three.js).
+
 ## Lancer en local
 
 ```bash
@@ -17,12 +21,11 @@ Un serveur HTTP est nécessaire (le produit est chargé depuis un fichier JSON).
 
 ## Parcours
 
-1. **Capacité** : chaque capacité a sa propre géométrie 3D.
-2. **Matière** : inox, aluminium, Tritan, avec finitions (mat, brillant, soft touch,
-   brossé, métallisé, transparent, givré). Chaque finition modifie le shader
-   (rugosité, métal, vernis, transmission, indice de réfraction).
-3. **Couleurs** : corps, bouchon et anse indépendants. Nuancier, HEX, RGB et
-   référence Pantone / usine.
+1. **Capacité** : un seul format, celui du master. Capacité et cotes : à confirmer usine.
+2. **Matière** : inox double paroi, finitions mat, brillant, soft touch et brossé naturel.
+   Chaque finition modifie le shader (rugosité, métal, vernis, grain).
+3. **Couleurs** : corps, bouchon et anse indépendants (nuancier, HEX, RGB, référence Pantone),
+   bague en inox poli ou métal noir. L'anse se rabat (bouton dans le viewer).
 4. **Marquage** : technique filtrée par matière, zone (face, dos, wrap 360°),
    import PNG / JPG / SVG, déplacement direct sur la bouteille ou sur le patron 2D,
    taille, rotation, zones de sécurité. La gravure laser révèle le métal avec relief.
@@ -36,7 +39,8 @@ Mobile : viewer en haut, panneau en bottom sheet (replié, moyen, plein écran).
 | Fichier | Rôle |
 |---|---|
 | `products/cricket-bottle/product.json` | Toutes les données produit : tailles, matières, couleurs, zones, techniques, règles, prix |
-| `js/viewer.js` | Scène 3D, géométrie de la bouteille, matériaux, caméra, capture |
+| `js/viewer.js` | Scène 3D, chargement du master GLB, matériaux par pièce, anse pivotante, caméra, capture |
+| `bottle-master/` | Reconstruction 3D contrainte : scripts Blender, calques de validation, .blend, GLB, rendus |
 | `js/artwork.js` | Composition du visuel, masque de gravure, patron 2D |
 | `js/pricing.js` | Règles de compatibilité et calcul du prix |
 | `js/main.js` | Étapes, état, récapitulatif, export projet, bottom sheet |
@@ -47,7 +51,9 @@ Aucun prix ni donnée usine n'a été inventé. Tant que ces valeurs sont vides,
 le configurateur affiche **Validation usine requise** au lieu d'un prix.
 
 - Capacité et matière exactes de la bouteille du devis Cricket.
-- Dimensions réelles (diamètre, hauteur, zone imprimable) de chaque capacité.
+- Échelle réelle du master (`scale.mmPerBodyHeight`) : tant qu'elle manque, les tailles
+  s'affichent en % de la zone imprimable.
+- Autres formats et matières (aluminium, Tritan, verre) : pas de master 3D ni de donnée usine.
 - Prix : base par capacité, suppléments matière et finition, prix par technique,
   frais de calage, remises par palier (`pricing` dans `product.json`).
 - MOQ.
@@ -63,5 +69,5 @@ Dès que les champs `pricing` sont remplis, le prix s'affiche instantanément
 ## Fichier projet exporté
 
 `product_id`, `variant_id`, `size`, `materials`, `colors`, `color_refs`, `artwork`,
-`artwork_transform` (mm), `printing_method`, `print_zones`, `quantity`, `pricing`,
+`artwork_transform` (unités BODY_HEIGHT, % de zone, mm si l'échelle est connue), `model`, `printing_method`, `print_zones`, `quantity`, `pricing`,
 `camera_preview`, `preview_image` (PNG), `timestamp`.
