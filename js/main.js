@@ -644,6 +644,10 @@ function download(name, href) {
 }
 
 function exportProject() {
+  if (window.SKLUBS_PREVIEW) {
+    toast('Aperçu en ligne : le téléchargement est bloqué ici. Il fonctionne sur le site SKLUBS.');
+    return buildProject();
+  }
   const proj = buildProject();
   const stamp = proj.timestamp.slice(0, 19).replace(/[:T]/g, '-');
   download(`sklubs-${proj.product_id}-${stamp}.png`, proj.preview_image);
@@ -657,7 +661,7 @@ function exportProject() {
 async function sendProject() {
   if (!SUBMIT_ENDPOINT) {
     exportProject();
-    toast('Envoi en ligne à brancher (point d\'envoi SKLUBS à définir). Projet et aperçu téléchargés.');
+    if (!window.SKLUBS_PREVIEW) toast('Envoi en ligne à brancher (point d\'envoi SKLUBS à définir). Projet et aperçu téléchargés.');
     return;
   }
   const btn = $('#sendBtn');
@@ -681,7 +685,7 @@ function bindChrome() {
   $('#ctaBtn').addEventListener('click', () => goStep(STEPS.length - 1));
   $('#editBtn').addEventListener('click', () => goStep(STEPS.length - 2));
   $('#sendBtn').addEventListener('click', sendProject);
-  $('#downloadBtn').addEventListener('click', () => { exportProject(); toast('Aperçu PNG et fichier projet téléchargés.'); });
+  $('#downloadBtn').addEventListener('click', () => { exportProject(); if (!window.SKLUBS_PREVIEW) toast('Aperçu PNG et fichier projet téléchargés.'); });
   $('#fileInput').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) handleFile(f); e.target.value = ''; });
 
   $('#views').addEventListener('click', (e) => {
