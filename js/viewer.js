@@ -117,11 +117,23 @@ export class BottleViewer {
   // ---------- Géométrie : master 3D validé (bottle-master/) ----------
   async loadMaster(url) {
     if (this.masterScene) return this.masterScene;
-    const draco = new DRACOLoader();
-    draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/');
     const loader = new GLTFLoader();
-    loader.setDRACOLoader(draco);
-    const gltf = await loader.loadAsync(url);
+    let gltf;
+    if (url.endsWith('.b64.txt')) {
+      // GLB encodé en base64 dans un fichier texte : pour les hébergeurs qui ne servent pas .glb
+      // et bloquent les URI data: (page d'aperçu). Décodé ici, puis analysé sans requête réseau.
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Modèle 3D introuvable (${res.status})`);
+      const bin = atob((await res.text()).trim());
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      gltf = await new Promise((resolve, reject) => loader.parse(bytes.buffer, '', resolve, reject));
+    } else {
+      const draco = new DRACOLoader();
+      draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/');
+      loader.setDRACOLoader(draco);
+      gltf = await loader.loadAsync(url);
+    }
     this.masterScene = gltf.scene;
     return this.masterScene;
   }
