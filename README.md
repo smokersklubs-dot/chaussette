@@ -12,9 +12,9 @@ Le modèle 3D affiché est le **master reconstruit et validé par calque** sur l
 
 ## Mettre en ligne
 
-**Le plus simple : dans WordPress.** `python3 tools/build_wp_plugin.py` produit `dist/sklubs-configurator.zip`
-(extension + configurateur inclus). Téléverser dans WordPress : la page `/configurateur-3d/` est créée.
-Voir `integration/wordpress/README.md`.
+**Configurateur : https://bouteille.sklubs.fr** (Vercel, pleine page). **Données et boutique : WordPress** —
+`python3 tools/build_wp_plugin.py` produit `dist/sklubs-configurator.zip` à téléverser dans WordPress
+(la page `/configurateur-3d/` redirige vers le sous-domaine). Voir `integration/wordpress/README.md`.
 
 ### Vercel (sous-domaine bouteille.sklubs.fr)
 
@@ -41,7 +41,8 @@ Ensuite, brancher le site WordPress : voir `integration/wordpress/README.md`.
 - **Back-office** : `admin.html` (connexion Supabase, comptes de la table `admins`) : produits, variantes, matières,
   couleurs, techniques, **paliers de prix**, MOQ, délai, catégories, projets clients et leur statut.
 - **WordPress / WooCommerce** : l'extension `integration/wordpress/sklubs-configurator/` affiche le configurateur
-  (page `/configurateur-3d/`, code court `[sklubs_configurateur]`) et **« Commander » ajoute la bouteille au panier
+  (le configurateur est sur `bouteille.sklubs.fr`, pleine page sans iframe ; la page `/configurateur-3d/` y redirige,
+  le code court `[sklubs_configurateur]` affiche un bouton) et **« Commander » ajoute la bouteille au panier
   WooCommerce** au prix serveur, avec tout le détail de la configuration dans la commande.
 - Sans Supabase : API WordPress (`<meta name="sklubs-api">`), puis fichiers `products/` du dépôt.
 

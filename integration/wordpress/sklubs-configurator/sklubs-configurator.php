@@ -2,17 +2,17 @@
 /**
  * Plugin Name: SKLUBS Configurateur
  * Description: Back-office des configurateurs 3D SKLUBS : produits, variantes, matières, couleurs, techniques de marquage, prix par paliers, catégories. Reçoit aussi les projets envoyés par les clients.
- * Version: 1.2.3
+ * Version: 1.3.0
  * Requires PHP: 7.4
  * Author: SKLUBS
  *
  * Installation : téléverser le ZIP (Extensions > Ajouter > Téléverser), puis l'activer.
- * Le configurateur 3D est inclus (dossier site/) : la page « Configurateur 3D » est créée à l'activation,
- * et le code court [sklubs_configurateur] l'affiche dans n'importe quelle page.
+ * Le configurateur 3D est sur son sous-domaine (https://bouteille.sklubs.fr, pleine page) : la page
+ * « Configurateur 3D » du site y redirige, le code court [sklubs_configurateur] affiche un bouton vers lui.
  */
 if (!defined('ABSPATH')) exit;
 
-define('SKLUBS_CFG_VERSION', '1.2.3');
+define('SKLUBS_CFG_VERSION', '1.3.0');
 define('SKLUBS_CFG_DIR', __DIR__);
 define('SKLUBS_CFG_URL', plugin_dir_url(__FILE__));
 const SKLUBS_CFG_NS = 'sklubs/v1';
@@ -149,11 +149,22 @@ function sklubs_cfg_product_data($id) {
 /* ---------- Configurateur 3D inclus (dossier site/) ---------- */
 
 // Adresse du configurateur : réglage (ex. hébergement Vercel) sinon la copie incluse dans l'extension
+// Le configurateur vit sur son sous-domaine (pleine page, sans iframe). Adresse modifiable dans les réglages.
+const SKLUBS_CFG_DEFAULT_APP = 'https://bouteille.sklubs.fr/';
 function sklubs_cfg_app_url() {
     $custom = trim((string) get_option('sklubs_cfg_configurator_url', ''));
-    if ($custom !== '') return trailingslashit($custom);
-    return file_exists(SKLUBS_CFG_DIR . '/site/index.html') ? SKLUBS_CFG_URL . 'site/' : '';
+    return trailingslashit($custom !== '' ? $custom : SKLUBS_CFG_DEFAULT_APP);
 }
+function sklubs_cfg_app_link($produit = '') {
+    $base = sklubs_cfg_app_url();
+    return $produit ? $base . 'configurateur?produit=' . rawurlencode(sanitize_title($produit)) : $base;
+}
+
+// La page « Configurateur 3D » du site renvoie vers le sous-domaine
+add_action('template_redirect', function () {
+    $page = (int) get_option('sklubs_cfg_page_id');
+    if ($page && is_page($page)) { wp_redirect(sklubs_cfg_app_link(), 302); exit; }
+});
 
 // Page « Configurateur 3D » créée une seule fois (si elle est supprimée ensuite, elle n'est pas recréée)
 function sklubs_cfg_create_page() {
@@ -162,50 +173,17 @@ function sklubs_cfg_create_page() {
     $id = $existing ? $existing->ID : wp_insert_post([
         'post_type' => 'page', 'post_status' => 'publish', 'post_name' => 'configurateur-3d', 'post_title' => 'Configurateur 3D',
         // bloc « pleine largeur » : le thème l'étend sur toute la page s'il le permet
-        'post_content' => "<!-- wp:group {\"align\":\"full\",\"layout\":{\"type\":\"default\"}} -->\n<div class=\"wp-block-group alignfull\"><!-- wp:shortcode -->\n[sklubs_configurateur]\n<!-- /wp:shortcode --></div>\n<!-- /wp:group -->",
+        // la page redirige vers le sous-domaine ; le bouton sert si la redirection est désactivée
+        'post_content' => "<!-- wp:shortcode -->\n[sklubs_configurateur]\n<!-- /wp:shortcode -->",
     ]);
     if ($id && !is_wp_error($id)) update_option('sklubs_cfg_page_id', (int) $id, false);
 }
 
-// [sklubs_configurateur produit="cricket-bottle" hauteur="880" largeur="contenu|pleine"]
+// [sklubs_configurateur produit="cricket-bottle" texte="Configurer ma bouteille en 3D"] : bouton vers le sous-domaine (pas d'iframe)
 add_shortcode('sklubs_configurateur', function ($atts) {
-    $a = shortcode_atts(['produit' => '', 'hauteur' => '880', 'largeur' => 'contenu'], $atts, 'sklubs_configurateur');
-    $base = sklubs_cfg_app_url();
-    if (!$base) return current_user_can('manage_options') ? '<p><strong>Configurateur SKLUBS :</strong> dossier site/ absent de l\'extension et aucune adresse dans Configurateur → Réglages.</p>' : '';
-    $produit = sanitize_title($a['produit']);
-    $src = $produit ? $base . 'configurateur.html?produit=' . rawurlencode($produit) : $base . 'index.html';
-    $src = add_query_arg('v', SKLUBS_CFG_VERSION, $src);
-    $h = max(560, (int) $a['hauteur']);
-    $full = $a['largeur'] === 'pleine' ? 'width:100vw;max-width:100vw;margin-left:calc(50% - 50vw);' : 'width:100%;';
-    $cfg = ['endpoint' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/project')), 'cart' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/cart')), 'nonce' => wp_create_nonce('wp_rest')];
-    $id = 'sklubs-cfg-' . wp_rand(1000, 9999);
-    // origine attendue des messages : fixée ici (les extensions de cache remplacent src par about:blank tant que le cadre n'est pas chargé)
-    $u = wp_parse_url($src);
-    $origin = $u['scheme'] . '://' . $u['host'] . (isset($u['port']) ? ':' . $u['port'] : '');
-    ob_start(); ?>
-    <div class="sklubs-cfg" style="<?php echo esc_attr($full); ?>position:relative;height:min(92vh,<?php echo (int) $h; ?>px);min-height:560px;overflow:hidden;background:#F6F6F4">
-      <iframe id="<?php echo esc_attr($id); ?>" class="skip-lazy no-lazyload" data-no-lazy="1" data-skip-lazy="1" src="<?php echo esc_url($src); ?>" title="Configurateur 3D SKLUBS" allow="fullscreen" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
-    </div>
-    <script>
-    (function () {
-      var frame = document.getElementById(<?php echo wp_json_encode($id); ?>);
-      var origin = <?php echo wp_json_encode($origin); ?>;
-      var cfg = <?php echo wp_json_encode($cfg); ?>;
-      window.addEventListener('message', function (e) {
-        if (e.origin !== origin || !e.data || e.data.type !== 'sklubs:bottle:project' || e.source !== frame.contentWindow) return;
-        var order = e.data.project && e.data.project.intent === 'order';
-        fetch(order ? cfg.cart : cfg.endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce }, body: JSON.stringify(e.data.project) })
-          .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || r.status); return j; }); })
-          .then(function (j) {
-            frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-received', reference: j.reference, redirect: j.redirect || null }, origin);
-            if (order && j.redirect) window.location.href = j.redirect; // panier WooCommerce
-          })
-          .catch(function (err) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-error', message: 'Envoi impossible (' + err.message + '). Réessayez ou contactez SKLUBS.' }, origin); });
-      });
-    })();
-    </script>
-    <?php
-    return ob_get_clean();
+    $a = shortcode_atts(['produit' => '', 'texte' => 'Configurer ma bouteille en 3D'], $atts, 'sklubs_configurateur');
+    return sprintf('<p class="sklubs-cfg-cta"><a href="%s" style="display:inline-flex;align-items:center;gap:12px;padding:16px 26px;border-radius:12px;background:#FF6B00;color:#fff;font-weight:700;letter-spacing:.04em;text-transform:uppercase;text-decoration:none">%s <span aria-hidden="true">→</span></a></p>',
+        esc_url(sklubs_cfg_app_link($a['produit'])), esc_html($a['texte']));
 });
 
 /* ------------------------------------------------------------------ API REST */
@@ -471,8 +449,8 @@ function sklubs_cfg_settings_page() {
     <div class="wrap"><h1>Réglages du configurateur</h1>
       <form method="post"><?php wp_nonce_field('sklubs_cfg_settings'); ?>
         <table class="form-table"><tr><th><label for="sklubs_cfg_url">Adresse du configurateur</label></th>
-          <td><input type="url" class="regular-text" id="sklubs_cfg_url" name="sklubs_cfg_url" value="<?php echo esc_attr($url); ?>" placeholder="vide = configurateur inclus dans l'extension">
-          <p class="description">Laisser vide pour utiliser le configurateur inclus (<code><?php echo esc_html(SKLUBS_CFG_URL . 'site/'); ?></code>). Renseigner seulement si le configurateur est hébergé ailleurs (ex. https://bouteille.sklubs.fr/).</p></td></tr>
+          <td><input type="url" class="regular-text" id="sklubs_cfg_url" name="sklubs_cfg_url" value="<?php echo esc_attr($url); ?>" placeholder="<?php echo esc_attr(SKLUBS_CFG_DEFAULT_APP); ?>">
+          <p class="description">Vide = <code><?php echo esc_html(SKLUBS_CFG_DEFAULT_APP); ?></code>. La page « Configurateur 3D » et le bouton <code>[sklubs_configurateur]</code> y mènent (pleine page, sans iframe).</p></td></tr>
           <tr><th>Page du site</th><td><?php echo $page && get_post_status($page) ? '<a href="' . esc_url(get_permalink($page)) . '" target="_blank">' . esc_html(get_permalink($page)) . '</a>' : '—'; ?>
           <p class="description">Code court pour une autre page : <code>[sklubs_configurateur]</code> (accueil, tous les produits) ou <code>[sklubs_configurateur produit="cricket-bottle"]</code>.</p></td></tr>
           <?php $sb = sklubs_cfg_supabase(); ?>

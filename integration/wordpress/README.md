@@ -1,102 +1,47 @@
-# Brancher le configurateur sur sklubs.fr (WordPress)
-
-Le configurateur est un site statique, hébergé à part (Vercel). WordPress sert de **back-office** :
-produits, variantes, prix, paliers de quantité, catégories, et réception des projets clients.
+# Configurateur SKLUBS : sous-domaine + WordPress / WooCommerce
 
 ```
-WordPress (extension SKLUBS Configurateur)          Configurateur (Vercel)
-  Admin → Configurateur → Produits   ──GET /catalog, /products/<id>──▶  accueil + configurateur 3D
-  Admin → Configurateur → Projets    ◀──POST /project (via la page qui l'intègre)──
+bouteille.sklubs.fr (Vercel, pleine page, sans iframe)        sklubs.fr (WordPress + WooCommerce)
+  accueil + configurateur 3D  ── /wp-json/sklubs/v1/* (relais Vercel) ──▶  produits, prix, devis
+  « Commander »               ── formulaire POST /?sklubs-cart=1 ────────▶  panier WooCommerce → commande
 ```
 
-## Méthode simple (recommandée) : tout dans WordPress
+- **Données** : dans WordPress (extension « SKLUBS Configurateur ») : produits, variantes, matières, couleurs,
+  techniques, paliers de prix, délai, catégories, projets clients. Admin : menu **Configurateur**.
+- **Configurateur** : uniquement sur **https://bouteille.sklubs.fr** (projet Vercel `sklubs-configurateur`).
+  La page `sklubs.fr/configurateur-3d/` redirige vers lui ; le code court `[sklubs_configurateur]` affiche un
+  bouton vers lui (`produit="cricket-bottle"` pour ouvrir directement un modèle, `texte="…"` pour le libellé).
+- **Lecture des données** : `vercel.json` relaie `/wp-json/sklubs/v1/*` vers sklubs.fr (l'hébergement de sklubs.fr
+  retire l'en-tête CORS pour les autres domaines ; le relais évite le problème).
+- **Devis** : envoyés à `/wp-json/sklubs/v1/project` (origine *.sklubs.fr vérifiée), visibles dans
+  **Configurateur → Projets clients**, e-mail à l'administrateur.
+- **Commander** (actif seulement si le prix est confirmé) : formulaire envoyé à `https://sklubs.fr/?sklubs-cart=1`.
+  Le site recalcule le prix, enregistre le projet et ajoute au panier un produit support caché
+  « … — personnalisée » (créé automatiquement, non achetable autrement), puis affiche le panier. Le détail
+  (référence, couleurs, marquage, aperçu) suit l'article jusqu'à la commande.
 
-L'extension contient le configurateur 3D (dossier `site/`). Pas besoin de Vercel ni de sous-domaine.
+## Installer / mettre à jour l'extension
 
-1. Construire le ZIP : `python3 tools/build_wp_plugin.py` → `dist/sklubs-configurator.zip`.
-2. WordPress : **Extensions → Ajouter → Téléverser une extension**, choisir le ZIP. Si l'extension est déjà
-   installée, WordPress propose **Remplacer l'actuelle par la version téléversée** : accepter.
-3. C'est tout : la page **Configurateur 3D** (`/configurateur-3d/`) est créée automatiquement
-   (une seule fois ; si vous la supprimez, elle n'est pas recréée).
+1. `python3 tools/build_wp_plugin.py` → `dist/sklubs-configurator.zip`.
+2. WordPress : **Extensions → Ajouter → Téléverser**, puis **Remplacer l'actuelle par la version téléversée**.
+3. Vider le cache (LiteSpeed Cache → Purger tout).
 
-Pour l'afficher dans une autre page : code court `[sklubs_configurateur]` (accueil, tous les produits) ou
-`[sklubs_configurateur produit="cricket-bottle"]`. Options : `hauteur="880"`, `largeur="pleine"`.
+Réglages (**Configurateur → Réglages**) : adresse du configurateur (vide = `https://bouteille.sklubs.fr/`).
+Les prix sont appliqués tels quels dans WooCommerce : les saisir HT si la boutique est réglée en HT.
 
-Après une mise à jour, vider le cache Cloudflare / de l'extension de cache si l'ancienne version reste affichée.
+## Sous-domaine
 
-## Supabase et WooCommerce
+- Vercel : projet `sklubs-configurateur`, relié au dépôt GitHub (chaque push est déployé), domaine `bouteille.sklubs.fr`.
+- Cloudflare (DNS de sklubs.fr) : `CNAME bouteille → (valeur indiquée par Vercel)`, **DNS only** (nuage gris).
 
-- **Supabase** (base principale) : URL et clé anon lues dans le configurateur inclus (balises meta, voir
-  `supabase/README.md`) ou saisies dans **Configurateur → Réglages**. L'onglet **Produits** affiche alors le
-  back-office Supabase (connexion par e-mail). Les devis vont directement dans Supabase.
-- **WooCommerce** : « Commander » (actif seulement si le prix est confirmé) envoie la configuration au site, qui
-  recalcule le prix, enregistre le projet dans Supabase et ajoute au panier un produit support caché
-  « … — personnalisée » (créé automatiquement, non achetable autrement). Le détail (référence, couleurs,
-  marquage, aperçu) suit l'article jusqu'à la commande ; avec le secret partagé (`SKLUBS_SHARED_SECRET`),
-  le projet Supabase passe au statut « Commandé » avec le numéro de commande.
-- Les prix saisis doivent suivre le réglage WooCommerce (prix saisis HT ou TTC).
+## Option Supabase
 
-## Variante : hébergement séparé (Vercel + bouteille.sklubs.fr)
-
-1. Vercel : importer le dépôt `chaussette` (Framework **Other**), domaine `bouteille.sklubs.fr`.
-2. Cloudflare (DNS de sklubs.fr) : `CNAME bouteille → cname.vercel-dns.com`, **DNS only** (nuage gris).
-3. **Configurateur → Réglages** : adresse `https://bouteille.sklubs.fr/`. Le code court et la page utilisent
-   alors cette adresse. `index.html` et `configurateur.html` lisent déjà l'API `https://sklubs.fr/wp-json/sklubs/v1`.
-4. Ou coller `sklubs-bottle-embed.html` dans un bloc **HTML personnalisé**.
-
-## 4. Gérer les produits (admin → Configurateur → Produits)
-
-| Onglet | Contenu |
-|---|---|
-| Général | Nom, identifiant, catégorie, vignette, sous-titre, tags, ordre à l'accueil, statut (en ligne / brouillon) |
-| Variantes | Capacités / formats, zone imprimable, modèle 3D par variante si différent |
-| Matières & finitions | Matières, finitions, finitions de bague, suppléments € / u |
-| Couleurs & pièces | Nuancier, pièces colorables, couleurs par défaut |
-| Marquage | Techniques, zones, frais de calage et prix par unité |
-| Prix & quantités | Paliers par variante (à partir de N pièces → prix € / u, badge « le plus choisi »), MOQ, délai, simulation |
-| Avancé (JSON) | Fiche complète, import / export |
-
-- **Nouveau modèle** : « Dupliquer » un produit existant ou « Nouveau produit », puis changer le modèle 3D
-  (`.glb` téléversable dans la médiathèque, voir plus bas).
-- **Prix vide = sur devis** : le configurateur affiche « Validation usine requise ».
-  Dès qu'un palier est rempli, il affiche le prix instantané et le tableau des paliers.
-- Le prix unitaire = palier de base + suppléments (matière, finition, bague, marquage) + calage ÷ quantité.
-
-## 5. Créer la page du site
-
-Dans une page WordPress (par exemple `/configurateur/`), ajouter un bloc **HTML personnalisé** et y coller
-`sklubs-bottle-embed.html` tel quel : il affiche `https://bouteille.sklubs.fr/` (accueil et tous les produits).
-Pour ouvrir directement la bouteille : `https://bouteille.sklubs.fr/configurateur?produit=cricket-bottle`.
-
-Quand le client clique sur « Envoyer le projet », le projet (paramètres, aperçu PNG, visuel) arrive dans
-**Configurateur → Projets clients** avec une référence `PRJ-…`, et un e-mail part à l'adresse d'administration.
-
-Si une extension de cache garde les pages plus de 12 heures, exclure cette page :
-le jeton WordPress expire au bout de 12 à 24 heures.
-
-## Modèles 3D dans la médiathèque
-
-L'extension autorise le téléversement de `.glb` / `.gltf` aux administrateurs. Le configurateur étant sur un
-autre domaine, le serveur doit renvoyer `Access-Control-Allow-Origin` pour ces fichiers, par exemple
-(Apache, `.htaccess` dans `wp-content/uploads/`) :
-
-```apache
-<FilesMatch "\.(glb|gltf)$">
-  Header set Access-Control-Allow-Origin "*"
-</FilesMatch>
-```
-
-Sinon, garder les modèles dans le dépôt du configurateur (`bottle-master/export/…`) et y mettre le chemin relatif.
+Le code Supabase (`supabase/`) reste disponible : base séparée, back-office `admin.html`. Non utilisé aujourd'hui
+(choix : données dans WordPress). Voir `supabase/README.md`.
 
 ## Sécurité
 
 - Lecture publique limitée au catalogue et aux fiches **en ligne** (les brouillons restent privés).
 - Écriture (produits, catégories) réservée aux administrateurs (`manage_options`, jeton REST).
-- Envoi de projet : jeton WordPress obligatoire, 12 Mo maximum, seuls les vrais fichiers PNG / JPEG sont gardés.
-- Le configurateur n'envoie le projet qu'aux pages de `sklubs.fr` et `sklubs.com` (`PARENT_ORIGINS` dans `js/main.js`),
-  et la page n'accepte les messages que de l'adresse du configurateur.
-
-## Plus tard : panier WooCommerce
-
-Le projet contient déjà le prix calculé. Quand les prix seront validés, la même page pourra créer
-l'article dans le panier WooCommerce au lieu d'enregistrer une demande de devis.
+- Devis et commandes : origine `sklubs.fr` ou sous-domaine obligatoire, 12 Mo maximum, seuls les vrais fichiers
+  PNG / JPEG sont gardés, prix toujours recalculé côté serveur.
