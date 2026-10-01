@@ -15,17 +15,21 @@
   var configuratorOrigin = new URL(frame.src, window.location.href).origin;
   var cfg = window.SKLUBS_BOTTLE || {};   // injecté par l'extension : { endpoint, nonce }
   window.addEventListener('message', function (e) {
-    if (e.origin !== configuratorOrigin || !e.data || e.data.type !== 'sklubs:bottle:project') return;
+    if (e.origin !== configuratorOrigin || !e.data || e.data.type !== 'sklubs:bottle:project' || e.source !== frame.contentWindow) return;
     if (!cfg.endpoint) {
       frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-error', message: 'Réception des projets non configurée sur le site.' }, configuratorOrigin);
       return;
     }
-    fetch(cfg.endpoint, {
+    var order = e.data.project && e.data.project.intent === 'order';
+    fetch(order && cfg.cart ? cfg.cart : cfg.endpoint, {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce },
       body: JSON.stringify(e.data.project)
     }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || r.status); return j; }); })
-      .then(function (j) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-received', reference: j.reference }, configuratorOrigin); })
+      .then(function (j) {
+        frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-received', reference: j.reference, redirect: j.redirect || null }, configuratorOrigin);
+        if (order && j.redirect) window.location.href = j.redirect; // panier WooCommerce
+      })
       .catch(function (err) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-error', message: 'Envoi impossible (' + err.message + '). Réessayez ou contactez SKLUBS.' }, configuratorOrigin); });
   });
 })();

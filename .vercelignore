@@ -6,3 +6,4 @@ bottle-master/export/*
 integration
 tools
 dist/
+supabase/

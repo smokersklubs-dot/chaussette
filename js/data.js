@@ -1,7 +1,16 @@
-// Source des données produits : API WordPress (extension « SKLUBS Configurateur ») si elle est déclarée,
-// sinon les fichiers JSON du dépôt. En cas d'erreur de l'API, repli automatique sur les fichiers.
-// Déclarer l'API : <meta name="sklubs-api" content="https://sklubs.fr/wp-json/sklubs/v1"> dans la page.
-const API = (document.querySelector('meta[name="sklubs-api"]')?.content || '').trim().replace(/\/$/, '');
+// Sources des données (dans cet ordre) :
+//   1. Supabase (base de données principale : produits, prix, catégories, projets)
+//        <meta name="sklubs-supabase" content="https://xxxx.supabase.co">
+//        <meta name="sklubs-supabase-key" content="clé anon publique">
+//   2. API WordPress (extension « SKLUBS Configurateur ») : <meta name="sklubs-api" content="https://sklubs.fr/wp-json/sklubs/v1">
+//      Toujours utilisée pour le panier WooCommerce (« Commander »).
+//   3. Fichiers JSON du dépôt (products/) : repli automatique si une source ne répond pas.
+const meta = (n) => (document.querySelector(`meta[name="${n}"]`)?.content || '').trim().replace(/\/$/, '');
+export const API = meta('sklubs-api');
+export const SUPABASE = { url: meta('sklubs-supabase'), key: meta('sklubs-supabase-key') };
+const HAS_SUPABASE = !!(SUPABASE.url && SUPABASE.key);
+export const supabaseHeaders = () => ({ apikey: SUPABASE.key, Authorization: `Bearer ${SUPABASE.key}`, 'Content-Type': 'application/json' });
+export const SUBMIT_URL = HAS_SUPABASE ? `${SUPABASE.url}/functions/v1/submit` : '';
 
 async function getJson(url) {
   // page d'aperçu autonome : données intégrées dans la page (voir tools/build_preview.py)
@@ -12,19 +21,37 @@ async function getJson(url) {
   return r.json();
 }
 
-export async function loadCatalog() {
-  if (API) {
-    try { return await getJson(`${API}/catalog`); } catch (e) { console.warn('API catalogue indisponible, repli sur les fichiers', e); }
-  }
-  return getJson('products/catalog.json');
+async function rpc(name, args = {}) {
+  const r = await fetch(`${SUPABASE.url}/rest/v1/rpc/${name}`, { method: 'POST', headers: supabaseHeaders(), body: JSON.stringify(args), credentials: 'omit' });
+  if (!r.ok) throw new Error(`Supabase ${name} : ${r.status}`);
+  const data = await r.json();
+  if (data === null) throw new Error(`Supabase ${name} : introuvable`);
+  return data;
 }
 
-export async function loadProduct(id) {
-  const safe = String(id).replace(/[^a-z0-9-]/gi, '');
-  if (API) {
-    try { return await getJson(`${API}/products/${safe}`); } catch (e) { console.warn('API produit indisponible, repli sur les fichiers', e); }
+async function firstOf(sources) {
+  let last;
+  for (const [label, fn] of sources) {
+    try { return await fn(); } catch (e) { last = e; console.warn(`${label} indisponible, source suivante`, e); }
   }
-  return getJson(`products/${safe}/product.json`);
+  throw last;
+}
+
+export function loadCatalog() {
+  return firstOf([
+    ...(HAS_SUPABASE ? [['Supabase', () => rpc('catalog')]] : []),
+    ...(API ? [['API WordPress', () => getJson(`${API}/catalog`)]] : []),
+    ['Fichiers', () => getJson('products/catalog.json')],
+  ]);
+}
+
+export function loadProduct(id) {
+  const safe = String(id).replace(/[^a-z0-9-]/gi, '');
+  return firstOf([
+    ...(HAS_SUPABASE ? [['Supabase', () => rpc('product', { p_id: safe })]] : []),
+    ...(API ? [['API WordPress', () => getJson(`${API}/products/${safe}`)]] : []),
+    ['Fichiers', () => getJson(`products/${safe}/product.json`)],
+  ]);
 }
 
 // Site SKLUBS qui intègre le configurateur (iframe). Mémorisé pour la session : après un passage

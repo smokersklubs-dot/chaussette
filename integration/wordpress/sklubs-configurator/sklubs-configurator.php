@@ -17,6 +17,8 @@ define('SKLUBS_CFG_DIR', __DIR__);
 define('SKLUBS_CFG_URL', plugin_dir_url(__FILE__));
 const SKLUBS_CFG_NS = 'sklubs/v1';
 const SKLUBS_CFG_MAX_PROJECT = 12 * 1024 * 1024;
+require_once __DIR__ . '/includes/pricing.php';
+require_once __DIR__ . '/includes/woocommerce.php';
 
 /* ------------------------------------------------------------------ données */
 
@@ -129,7 +131,7 @@ add_shortcode('sklubs_configurateur', function ($atts) {
     $src = add_query_arg('v', SKLUBS_CFG_VERSION, $src);
     $h = max(560, (int) $a['hauteur']);
     $full = $a['largeur'] === 'pleine' ? 'width:100vw;max-width:100vw;margin-left:calc(50% - 50vw);' : 'width:100%;';
-    $cfg = ['endpoint' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/project')), 'nonce' => wp_create_nonce('wp_rest')];
+    $cfg = ['endpoint' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/project')), 'cart' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/cart')), 'nonce' => wp_create_nonce('wp_rest')];
     $id = 'sklubs-cfg-' . wp_rand(1000, 9999);
     ob_start(); ?>
     <div class="sklubs-cfg" style="<?php echo esc_attr($full); ?>position:relative;height:min(92vh,<?php echo (int) $h; ?>px);min-height:560px;overflow:hidden;background:#F6F6F4">
@@ -142,9 +144,13 @@ add_shortcode('sklubs_configurateur', function ($atts) {
       var cfg = <?php echo wp_json_encode($cfg); ?>;
       window.addEventListener('message', function (e) {
         if (e.origin !== origin || !e.data || e.data.type !== 'sklubs:bottle:project' || e.source !== frame.contentWindow) return;
-        fetch(cfg.endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce }, body: JSON.stringify(e.data.project) })
+        var order = e.data.project && e.data.project.intent === 'order';
+        fetch(order ? cfg.cart : cfg.endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce }, body: JSON.stringify(e.data.project) })
           .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || r.status); return j; }); })
-          .then(function (j) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-received', reference: j.reference }, origin); })
+          .then(function (j) {
+            frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-received', reference: j.reference, redirect: j.redirect || null }, origin);
+            if (order && j.redirect) window.location.href = j.redirect; // panier WooCommerce
+          })
           .catch(function (err) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-error', message: 'Envoi impossible (' + err.message + '). Réessayez ou contactez SKLUBS.' }, origin); });
       });
     })();
@@ -223,11 +229,11 @@ add_action('rest_api_init', function () {
         }],
     ]);
 
-    // projets clients (page du site qui intègre le configurateur)
+    // projets clients et panier : page du site (jeton) ou configurateur sur un domaine SKLUBS (bouteille.sklubs.fr)
     foreach (['/project', '/bottle-project'] as $route) {
-        register_rest_route(SKLUBS_CFG_NS, $route, ['methods' => 'POST', 'callback' => 'sklubs_cfg_receive_project',
-            'permission_callback' => fn($r) => (bool) wp_verify_nonce($r->get_header('X-WP-Nonce'), 'wp_rest')]);
+        register_rest_route(SKLUBS_CFG_NS, $route, ['methods' => 'POST', 'callback' => 'sklubs_cfg_receive_project', 'permission_callback' => 'sklubs_cfg_can_submit']);
     }
+    register_rest_route(SKLUBS_CFG_NS, '/cart', ['methods' => 'POST', 'callback' => 'sklubs_cfg_add_to_cart', 'permission_callback' => 'sklubs_cfg_can_submit']);
 });
 
 // lecture publique depuis le domaine du configurateur (catalogue et fiches produit uniquement)
@@ -240,11 +246,50 @@ add_filter('rest_pre_serve_request', function ($served, $result, $request) {
     return $served;
 }, 10, 3);
 
-function sklubs_cfg_receive_project(WP_REST_Request $r) {
+// Envoi autorisé : jeton WordPress (page du site) ou origine SKLUBS (configurateur sur sous-domaine)
+function sklubs_cfg_origin_ok($origin) {
+    $host = strtolower((string) wp_parse_url((string) $origin, PHP_URL_HOST));
+    if (!$host || wp_parse_url((string) $origin, PHP_URL_SCHEME) !== 'https' && $host !== wp_parse_url(home_url(), PHP_URL_HOST)) return false;
+    $allowed = array_filter([wp_parse_url(home_url(), PHP_URL_HOST), wp_parse_url(sklubs_cfg_app_url(), PHP_URL_HOST), 'sklubs.fr', 'sklubs.com']);
+    foreach ($allowed as $a) {
+        $a = preg_replace('/^www\./', '', strtolower($a));
+        if ($host === $a || substr($host, -strlen('.' . $a)) === '.' . $a) return true;
+    }
+    return false;
+}
+function sklubs_cfg_can_submit(WP_REST_Request $r) {
+    if (wp_verify_nonce($r->get_header('X-WP-Nonce'), 'wp_rest')) return true;
+    return sklubs_cfg_origin_ok($r->get_header('Origin'));
+}
+
+function sklubs_cfg_parse_project(WP_REST_Request $r) {
     $raw = $r->get_body();
     if (strlen($raw) > SKLUBS_CFG_MAX_PROJECT) return new WP_Error('too_large', 'Projet trop volumineux.', ['status' => 413]);
     $p = json_decode($raw, true);
     if (!is_array($p) || empty($p['product_id'])) return new WP_Error('invalid', 'Projet invalide.', ['status' => 400]);
+    $p['product_id'] = sanitize_title($p['product_id']);
+    return $p;
+}
+
+function sklubs_cfg_receive_project(WP_REST_Request $r) {
+    $p = sklubs_cfg_parse_project($r);
+    if (is_wp_error($p)) return $p;
+    if (($p['intent'] ?? '') === 'order') $p['intent'] = 'quote'; // une commande passe par /cart (prix serveur)
+    // prix recalculé sur le serveur, joint au projet (celui du navigateur reste à titre indicatif)
+    $post = sklubs_cfg_post($p['product_id']);
+    $price = null;
+    if ($post) {
+        $product = sklubs_cfg_data($post);
+        $cfg = sklubs_cfg_config_from_project($product, $p);
+        if (!is_wp_error($cfg)) $p['pricing_server'] = $price = sklubs_cfg_compute_price($product, $cfg);
+    }
+    $saved = sklubs_cfg_store_project($p, false);
+    if (is_wp_error($saved)) return $saved;
+    sklubs_cfg_notify($saved, $p, $price);
+    return ['ok' => true, 'reference' => $saved['ref']];
+}
+
+function sklubs_cfg_store_project(array $p, $unused = false) {
     $ref = 'PRJ-' . gmdate('ymd') . '-' . strtoupper(wp_generate_password(5, false));
     $qty = (int) ($p['quantity'] ?? 0);
     // type de demande envoyé par le configurateur : devis, commande ou simple ajout au projet
@@ -282,15 +327,19 @@ function sklubs_cfg_receive_project(WP_REST_Request $r) {
     update_post_meta($id, '_sklubs_ref', $ref);
     update_post_meta($id, '_sklubs_project', wp_slash(wp_json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)));
     update_post_meta($id, '_sklubs_files', $files);
-    $price = $p['pricing'] ?? [];
     update_post_meta($id, '_sklubs_intent', $intent);
-    wp_mail(get_option('admin_email'), "{$intents[$intent]} configurateur $ref",
-        "Référence : $ref\nDemande : {$intents[$intent]}\nProduit : {$p['product_id']}\nQuantité : $qty\nPrix : " .
-        (isset($price['unit']) && $price['unit'] !== null ? number_format((float) $price['unit'], 2, ',', ' ') . ' € / u' : 'sur devis') . "\n\n" .
-        implode("\n", array_map(fn($k, $v) => "$k : $v", array_keys($files), $files)) .
-        "\n\nDétail : " . admin_url("post.php?post=$id&action=edit"));
-    return ['ok' => true, 'reference' => $ref];
+    return ['id' => $id, 'ref' => $ref, 'files' => $files, 'intent' => $intent, 'label' => $intents[$intent], 'qty' => $qty];
 }
+
+// E-mail à l'administrateur (prix serveur)
+function sklubs_cfg_notify(array $saved, array $p, $price) {
+    $unit = is_array($price) && $price['unit'] !== null ? number_format((float) $price['unit'], 2, ',', ' ') . ' ' . ($price['currency'] ?? 'EUR') . ' / u ' . ($price['taxLabel'] ?? '') : 'sur devis';
+    wp_mail(get_option('admin_email'), "{$saved['label']} configurateur {$saved['ref']}",
+        "Référence : {$saved['ref']}\nDemande : {$saved['label']}\nProduit : {$p['product_id']}\nQuantité : {$saved['qty']}\nPrix : $unit\n\n" .
+        implode("\n", array_map(fn($k, $v) => "$k : $v", array_keys($saved['files']), $saved['files'])) .
+        "\n\nDétail : " . admin_url("post.php?post={$saved['id']}&action=edit"));
+}
+
 
 add_action('add_meta_boxes', function () {
     add_meta_box('sklubs_project_detail', 'Configuration', function ($post) {
@@ -305,7 +354,7 @@ add_action('add_meta_boxes', function () {
 // jeton et point d'envoi pour les pages qui intègrent le configurateur
 add_action('wp_head', function () {
     printf('<script>window.SKLUBS_BOTTLE=window.SKLUBS_CFG=%s;</script>', wp_json_encode([
-        'endpoint' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/project')), 'nonce' => wp_create_nonce('wp_rest'),
+        'endpoint' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/project')), 'cart' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/cart')), 'nonce' => wp_create_nonce('wp_rest'),
     ]));
 });
 

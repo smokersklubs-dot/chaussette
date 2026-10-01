@@ -1,5 +1,5 @@
 import { BottleViewer } from './viewer.js';
-import { loadProduct, detectParentOrigin } from './data.js';
+import { API, SUBMIT_URL, supabaseHeaders, loadProduct, detectParentOrigin } from './data.js';
 import { ArtworkEngine } from './artwork.js';
 import { allowedFinishes, allowedMethods, allowedZones, computePrice, sanitize } from './pricing.js';
 
@@ -15,8 +15,12 @@ function colorsFromUrl() {
   }
   return out;
 }
-// Point d'envoi direct (API) : optionnel. Sur le site, l'envoi passe par la page parente (voir integration/wordpress).
-const SUBMIT_ENDPOINT = null;
+// Envoi des projets :
+//   devis / projet enregistré -> Supabase (fonction « submit ») ; sinon page du site (postMessage) ; sinon API WordPress
+//   commande -> panier WooCommerce : page du site (postMessage) ou API WordPress /cart (prix recalculé par le serveur)
+//   sans aucun point d'envoi : téléchargement du projet
+const SUBMIT_ENDPOINT = SUBMIT_URL || (API ? `${API}/project` : null);
+const CART_ENDPOINT = API ? `${API}/cart` : null;
 // Page du site SKLUBS qui intègre le configurateur et reçoit les projets (postMessage) : voir data.js
 const parentOrigin = detectParentOrigin();
 
@@ -147,6 +151,8 @@ function update({ model = false, materials = true } = {}) {
   sanitize(product, cfg);
   syncZone();
   cfg.hasArtwork = artwork.hasArt;
+  const cat = product.colors.catalog.map((c) => c.hex.toLowerCase());
+  cfg.customColor = ['body', 'cap', 'handle'].some((k) => (k !== 'body' || product.finishes[cfg.finish]?.colorable !== false) && !cat.includes(String(cfg.colors[k]).toLowerCase()));
   if (model) rebuildModel();
   else if (materials) viewer.applyConfig(cfg, product);
   renderSpec();
@@ -930,7 +936,7 @@ function sendToParent(intent = 'quote') {
 
 window.addEventListener('message', (e) => {
   if (!parentOrigin || e.origin !== parentOrigin) return;
-  if (e.data?.type === 'sklubs:bottle:project-received') toast(`Projet reçu par SKLUBS${e.data.reference ? ` (réf. ${e.data.reference})` : ''}. Nous revenons vers vous avec le chiffrage.`);
+  if (e.data?.type === 'sklubs:bottle:project-received') toast(e.data.redirect ? `Ajouté au panier (réf. ${e.data.reference}). Redirection…` : `Projet reçu par SKLUBS${e.data.reference ? ` (réf. ${e.data.reference})` : ''}. Nous revenons vers vous avec le chiffrage.`);
   if (e.data?.type === 'sklubs:bottle:project-error') toast(e.data.message || 'Envoi impossible. Réessayez ou contactez SKLUBS.');
 });
 
@@ -943,28 +949,42 @@ function saveProject() {
   list = [light, ...list].slice(0, 12);
   let saved = false;
   try { localStorage.setItem('sklubs-projects', JSON.stringify(list)); saved = true; } catch { /* quota ou navigation privée */ }
-  if (parentOrigin) sendToParent('save');
+  if (SUBMIT_URL || (!parentOrigin && SUBMIT_ENDPOINT)) sendProject('save');
+  else if (parentOrigin) sendToParent('save');
   else toast(saved ? `Ajouté au projet : ${list.length} configuration${list.length > 1 ? 's' : ''} enregistrée${list.length > 1 ? 's' : ''} sur cet appareil.` : 'Enregistrement impossible sur cet appareil : téléchargez le rendu ou demandez un devis.');
 }
 
 async function sendProject(intent = 'quote') {
-  if (parentOrigin) { sendToParent(intent); return; }
-  if (!SUBMIT_ENDPOINT) {
+  const toSupabase = intent !== 'order' && !!SUBMIT_URL;
+  if (parentOrigin && !toSupabase) { sendToParent(intent); return; }
+  const url = intent === 'order' ? CART_ENDPOINT : SUBMIT_ENDPOINT;
+  if (!url) {
     exportProject();
-    if (!window.SKLUBS_PREVIEW) toast('Envoi en ligne à brancher (point d\'envoi SKLUBS à définir). Projet et aperçu téléchargés.');
+    if (!window.SKLUBS_PREVIEW) toast('Envoi en ligne indisponible ici : projet et aperçu téléchargés.');
     return;
   }
-  const btn = $('#sendBtn');
-  btn.disabled = true;
+  const btns = ['#sendBtn', '#orderBtn', '#saveBtn'].map((s) => $(s));
+  btns.forEach((b) => { b.disabled = true; });
+  toast(intent === 'order' ? 'Ajout au panier…' : 'Envoi du projet à SKLUBS…');
   try {
-    const res = await fetch(SUBMIT_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildProject(intent)) });
-    if (!res.ok) throw new Error(res.status);
-    toast('Projet envoyé à SKLUBS.');
-  } catch {
-    toast('Envoi impossible. Le projet a été téléchargé à la place.');
+    // credentials : le panier WooCommerce de sklubs.fr suit le visiteur
+    const res = toSupabase
+      ? await fetch(url, { method: 'POST', credentials: 'omit', headers: supabaseHeaders(), body: JSON.stringify(buildProject(intent)) })
+      : await fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildProject(intent)) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.message || `erreur ${res.status}`);
+    if (intent === 'order' && j.redirect) {
+      toast(`Ajouté au panier (réf. ${j.reference}). Redirection…`);
+      setTimeout(() => { try { window.top.location.href = j.redirect; } catch { window.open(j.redirect, '_blank'); } }, 600);
+    } else {
+      toast(intent === 'save' ? `Configuration enregistrée chez SKLUBS (réf. ${j.reference}).` : `Projet reçu par SKLUBS (réf. ${j.reference}). Nous revenons vers vous avec le chiffrage.`);
+    }
+  } catch (err) {
+    toast(`Envoi impossible : ${err.message}. Le projet a été téléchargé à la place.`);
     exportProject();
   } finally {
-    btn.disabled = false;
+    btns.forEach((b) => { b.disabled = false; });
+    $('#orderBtn').disabled = computePrice(product, cfg).status !== 'instant';
   }
 }
 
