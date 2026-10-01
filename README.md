@@ -16,7 +16,13 @@ Le modèle 3D affiché est le **master reconstruit et validé par calque** sur l
 (extension + configurateur inclus). Téléverser dans WordPress : la page `/configurateur-3d/` est créée.
 Voir `integration/wordpress/README.md`.
 
-### Variante Vercel
+### Vercel (sous-domaine bouteille.sklubs.fr)
+
+Projet Vercel `sklubs-configurateur` (relié au dépôt GitHub : chaque push est déployé) :
+https://sklubs-configurateur.vercel.app — domaine `bouteille.sklubs.fr` (DNS Cloudflare : CNAME vers Vercel, DNS only).
+Les données (produits, prix, projets, panier) viennent de WordPress (`<meta name="sklubs-api">`).
+
+#### Mise en place
 
 1. Sur vercel.com : **Add New → Project**, importer le dépôt GitHub `smokersklubs-dot/chaussette`.
 2. Framework : **Other**. Pas de commande de build, dossier de sortie : racine.
