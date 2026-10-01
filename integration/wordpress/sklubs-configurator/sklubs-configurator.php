@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SKLUBS Configurateur
  * Description: Back-office des configurateurs 3D SKLUBS : produits, variantes, matières, couleurs, techniques de marquage, prix par paliers, catégories. Reçoit aussi les projets envoyés par les clients.
- * Version: 1.2.2
+ * Version: 1.2.3
  * Requires PHP: 7.4
  * Author: SKLUBS
  *
@@ -12,7 +12,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-define('SKLUBS_CFG_VERSION', '1.2.2');
+define('SKLUBS_CFG_VERSION', '1.2.3');
 define('SKLUBS_CFG_DIR', __DIR__);
 define('SKLUBS_CFG_URL', plugin_dir_url(__FILE__));
 const SKLUBS_CFG_NS = 'sklubs/v1';
@@ -179,14 +179,17 @@ add_shortcode('sklubs_configurateur', function ($atts) {
     $full = $a['largeur'] === 'pleine' ? 'width:100vw;max-width:100vw;margin-left:calc(50% - 50vw);' : 'width:100%;';
     $cfg = ['endpoint' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/project')), 'cart' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/cart')), 'nonce' => wp_create_nonce('wp_rest')];
     $id = 'sklubs-cfg-' . wp_rand(1000, 9999);
+    // origine attendue des messages : fixée ici (les extensions de cache remplacent src par about:blank tant que le cadre n'est pas chargé)
+    $u = wp_parse_url($src);
+    $origin = $u['scheme'] . '://' . $u['host'] . (isset($u['port']) ? ':' . $u['port'] : '');
     ob_start(); ?>
     <div class="sklubs-cfg" style="<?php echo esc_attr($full); ?>position:relative;height:min(92vh,<?php echo (int) $h; ?>px);min-height:560px;overflow:hidden;background:#F6F6F4">
-      <iframe id="<?php echo esc_attr($id); ?>" src="<?php echo esc_url($src); ?>" title="Configurateur 3D SKLUBS" allow="fullscreen" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+      <iframe id="<?php echo esc_attr($id); ?>" class="skip-lazy no-lazyload" data-no-lazy="1" data-skip-lazy="1" src="<?php echo esc_url($src); ?>" title="Configurateur 3D SKLUBS" allow="fullscreen" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
     </div>
     <script>
     (function () {
       var frame = document.getElementById(<?php echo wp_json_encode($id); ?>);
-      var origin = new URL(frame.src, location.href).origin;
+      var origin = <?php echo wp_json_encode($origin); ?>;
       var cfg = <?php echo wp_json_encode($cfg); ?>;
       window.addEventListener('message', function (e) {
         if (e.origin !== origin || !e.data || e.data.type !== 'sklubs:bottle:project' || e.source !== frame.contentWindow) return;
