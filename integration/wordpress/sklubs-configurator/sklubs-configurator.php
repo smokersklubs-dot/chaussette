@@ -283,7 +283,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
     wp_enqueue_script('sklubs-admin', SKLUBS_CFG_URL . 'admin/app.js', [], SKLUBS_CFG_VERSION, true);
     wp_localize_script('sklubs-admin', 'SKLUBS_ADMIN', [
         'root' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/')), 'nonce' => wp_create_nonce('wp_rest'),
-        'configuratorUrl' => (string) get_option('sklubs_cfg_configurator_url', ''),
+        'configuratorUrl' => (string) get_option('sklubs_cfg_configurator_url', 'https://bouteille.sklubs.fr/'),
         'template' => json_decode((string) @file_get_contents(SKLUBS_CFG_DIR . '/seed/template.json'), true),
     ]);
 });
@@ -293,7 +293,7 @@ function sklubs_cfg_settings_page() {
         update_option('sklubs_cfg_configurator_url', esc_url_raw(wp_unslash($_POST['sklubs_cfg_url'])), false);
         echo '<div class="notice notice-success"><p>Réglages enregistrés.</p></div>';
     }
-    $url = get_option('sklubs_cfg_configurator_url', '');
+    $url = get_option('sklubs_cfg_configurator_url', 'https://bouteille.sklubs.fr/');
     $api = rest_url(SKLUBS_CFG_NS);
     ?>
     <div class="wrap"><h1>Réglages du configurateur</h1>

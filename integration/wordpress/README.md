@@ -23,14 +23,14 @@ Voir « Mettre en ligne » dans le `README.md` à la racine (Vercel, sous-domain
 
 ## 3. Relier le configurateur à WordPress
 
-Dans `index.html` **et** `configurateur.html`, renseigner la balise :
+C'est déjà fait dans le dépôt : `index.html` et `configurateur.html` contiennent
 
 ```html
 <meta name="sklubs-api" content="https://sklubs.fr/wp-json/sklubs/v1">
 ```
 
-Puis pousser : Vercel redéploie. Vide, le configurateur lit les fichiers `products/` du dépôt.
-Si l'API ne répond pas, il retombe aussi sur ces fichiers.
+Tant que l'extension n'est pas installée (ou si l'API ne répond pas), le configurateur lit les fichiers
+`products/` du dépôt : rien ne casse. Vider la balise pour ne plus utiliser WordPress.
 
 ## 4. Gérer les produits (admin → Configurateur → Produits)
 
@@ -52,9 +52,9 @@ Si l'API ne répond pas, il retombe aussi sur ces fichiers.
 
 ## 5. Créer la page du site
 
-Dans une page WordPress, ajouter un bloc **HTML personnalisé** et y coller `sklubs-bottle-embed.html`,
-en remplaçant `CONFIGURATOR_URL` par l'adresse du configurateur, par exemple
-`https://bouteille.sklubs.fr/configurateur?produit=cricket-bottle`, ou l'accueil `https://bouteille.sklubs.fr/`.
+Dans une page WordPress (par exemple `/configurateur/`), ajouter un bloc **HTML personnalisé** et y coller
+`sklubs-bottle-embed.html` tel quel : il affiche `https://bouteille.sklubs.fr/` (accueil et tous les produits).
+Pour ouvrir directement la bouteille : `https://bouteille.sklubs.fr/configurateur?produit=cricket-bottle`.
 
 Quand le client clique sur « Envoyer le projet », le projet (paramètres, aperçu PNG, visuel) arrive dans
 **Configurateur → Projets clients** avec une référence `PRJ-…`, et un e-mail part à l'adresse d'administration.

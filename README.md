@@ -15,7 +15,8 @@ Le modèle 3D affiché est le **master reconstruit et validé par calque** sur l
 1. Sur vercel.com : **Add New → Project**, importer le dépôt GitHub `smokersklubs-dot/chaussette`.
 2. Framework : **Other**. Pas de commande de build, dossier de sortie : racine.
    Branche de production : `claude/brave-mccarthy-1l0zbc` (seule branche du dépôt pour l'instant). Déployer.
-3. Domaine : ajouter par exemple `bouteille.sklubs.fr` dans **Settings → Domains**.
+3. Domaine : ajouter `bouteille.sklubs.fr` dans **Settings → Domains**, puis chez le registraire de sklubs.fr
+   un enregistrement DNS `CNAME bouteille → cname.vercel-dns.com`.
 
 `vercel.json` autorise l'affichage du configurateur dans les pages de sklubs.fr et sklubs.com, et sert le modèle 3D
 avec le bon type. `.vercelignore` ne publie que le site et le modèle web (pas les fichiers de travail Blender).

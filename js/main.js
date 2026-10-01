@@ -1,5 +1,5 @@
 import { BottleViewer } from './viewer.js';
-import { loadProduct } from './data.js';
+import { loadProduct, detectParentOrigin } from './data.js';
 import { ArtworkEngine } from './artwork.js';
 import { allowedFinishes, allowedMethods, allowedZones, computePrice, sanitize } from './pricing.js';
 
@@ -17,15 +17,8 @@ function colorsFromUrl() {
 }
 // Point d'envoi direct (API) : optionnel. Sur le site, l'envoi passe par la page parente (voir integration/wordpress).
 const SUBMIT_ENDPOINT = null;
-// Pages autorisées à intégrer le configurateur et à recevoir les projets (postMessage)
-const PARENT_ORIGINS = ['https://sklubs.fr', 'https://www.sklubs.fr', 'https://sklubs.com', 'https://www.sklubs.com'];
-const parentOrigin = (() => {
-  if (window.parent === window) return null;
-  try {
-    const o = document.referrer ? new URL(document.referrer).origin : null;
-    return PARENT_ORIGINS.includes(o) ? o : null;
-  } catch { return null; }
-})();
+// Page du site SKLUBS qui intègre le configurateur et reçoit les projets (postMessage) : voir data.js
+const parentOrigin = detectParentOrigin();
 
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, attrs = {}, html = '') => {

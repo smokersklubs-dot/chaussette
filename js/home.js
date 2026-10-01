@@ -1,5 +1,5 @@
 // Accueil : hero 3D, choix du type de produit, choix du modèle. Données : API WordPress ou products/ (voir data.js).
-import { loadCatalog, loadProduct } from './data.js';
+import { loadCatalog, loadProduct, detectParentOrigin } from './data.js';
 import { ShowBottle } from './hero3d.js';
 
 const $ = (s) => document.querySelector(s);
@@ -37,6 +37,8 @@ function miniBottle(hex) {
     <path d="M6.6 12h8.8v1.5c3.4 1.6 4.6 3.8 4.6 6.6V49a3 3 0 01-3 3H5a3 3 0 01-3-3V20.1c0-2.8 1.2-5 4.6-6.6z" fill="${hex}" stroke="rgba(17,17,17,.12)" stroke-width=".6"/>
   </svg>`;
 }
+
+detectParentOrigin(); // mémorise le site parent pour le configurateur ouvert depuis cet accueil
 
 // ---------- Données ----------
 const catalog = await loadCatalog();

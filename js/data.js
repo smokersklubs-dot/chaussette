@@ -26,3 +26,15 @@ export async function loadProduct(id) {
   }
   return getJson(`products/${safe}/product.json`);
 }
+
+// Site SKLUBS qui intègre le configurateur (iframe). Mémorisé pour la session : après un passage
+// accueil -> configurateur dans l'iframe, le referrer n'est plus la page du site.
+export const PARENT_ORIGINS = ['https://sklubs.fr', 'https://www.sklubs.fr', 'https://sklubs.com', 'https://www.sklubs.com'];
+export function detectParentOrigin() {
+  if (window.parent === window) return null;
+  const candidates = [location.ancestorOrigins?.[0], (() => { try { return document.referrer ? new URL(document.referrer).origin : null; } catch { return null; } })()];
+  for (const o of candidates) {
+    if (PARENT_ORIGINS.includes(o)) { try { sessionStorage.setItem('sklubs-parent', o); } catch { /* stockage bloqué */ } return o; }
+  }
+  try { const o = sessionStorage.getItem('sklubs-parent'); return PARENT_ORIGINS.includes(o) ? o : null; } catch { return null; }
+}
