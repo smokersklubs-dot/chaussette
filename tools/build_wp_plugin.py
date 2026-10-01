@@ -30,6 +30,7 @@ def site_file(rel):
         # même domaine que WordPress : API relative ; liens d'accueil explicites (pas d'index de dossier)
         s = re.sub(r'<meta name="sklubs-api" content="[^"]*">', '<meta name="sklubs-api" content="/wp-json/sklubs/v1">', s)
         s = s.replace('href="./"', 'href="index.html"')
+        s = re.sub(r'<meta name="sklubs-shop" content="[^"]*">', '<meta name="sklubs-shop" content="">', s)  # même site : panier direct
         if OPTS.get('supabase-url'):
             s = re.sub(r'<meta name="sklubs-supabase" content="[^"]*">', f'<meta name="sklubs-supabase" content="{OPTS["supabase-url"]}">', s)
         if OPTS.get('supabase-key'):

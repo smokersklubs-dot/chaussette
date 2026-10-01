@@ -1,5 +1,5 @@
 import { BottleViewer } from './viewer.js';
-import { API, SUBMIT_URL, supabaseHeaders, loadProduct, detectParentOrigin } from './data.js';
+import { API, SHOP, SUBMIT_URL, supabaseHeaders, loadProduct, detectParentOrigin } from './data.js';
 import { ArtworkEngine } from './artwork.js';
 import { allowedFinishes, allowedMethods, allowedZones, computePrice, sanitize } from './pricing.js';
 
@@ -954,9 +954,20 @@ function saveProject() {
   else toast(saved ? `Ajouté au projet : ${list.length} configuration${list.length > 1 ? 's' : ''} enregistrée${list.length > 1 ? 's' : ''} sur cet appareil.` : 'Enregistrement impossible sur cet appareil : téléchargez le rendu ou demandez un devis.');
 }
 
+// Commande depuis un autre domaine (bouteille.sklubs.fr) : formulaire envoyé à la boutique, qui ajoute au panier
+// puis affiche le panier — le panier WooCommerce reste ainsi celui du client sur sklubs.fr.
+function orderOnShop() {
+  const form = el('form', { method: 'POST', action: `${SHOP.replace(/\/$/, '')}/?sklubs-cart=1`, target: '_top', hidden: true });
+  form.append(el('input', { type: 'hidden', name: 'sklubs_project', value: JSON.stringify(buildProject('order')) }));
+  document.body.append(form);
+  toast('Ajout au panier…');
+  form.submit();
+}
+
 async function sendProject(intent = 'quote') {
   const toSupabase = intent !== 'order' && !!SUBMIT_URL;
   if (parentOrigin && !toSupabase) { sendToParent(intent); return; }
+  if (intent === 'order' && SHOP && new URL(SHOP, location.href).origin !== location.origin) { orderOnShop(); return; }
   const url = intent === 'order' ? CART_ENDPOINT : SUBMIT_ENDPOINT;
   if (!url) {
     exportProject();

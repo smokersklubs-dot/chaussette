@@ -2,8 +2,10 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <!-- API produits (extension WordPress « SKLUBS Configurateur » sur sklubs.fr). Vide = fichiers du dépôt ; si l'API ne répond pas, repli automatique sur les fichiers. -->
-  <meta name="sklubs-api" content="https://sklubs.fr/wp-json/sklubs/v1">
+  <!-- API produits (extension WordPress « SKLUBS Configurateur »). Chemin relatif : sur Vercel, /wp-json/sklubs/v1 est relayé vers sklubs.fr (vercel.json) ; dans l'extension, c'est le site lui-même. Repli automatique sur les fichiers du dépôt. -->
+  <meta name="sklubs-api" content="/wp-json/sklubs/v1">
+  <!-- Boutique WooCommerce : « Commander » envoie le client sur ce site (panier) -->
+  <meta name="sklubs-shop" content="https://sklubs.fr">
   <!-- Base de données Supabase (URL du projet + clé anon publique). Vides = API WordPress puis fichiers du dépôt. -->
   <meta name="sklubs-supabase" content="">
   <meta name="sklubs-supabase-key" content="">

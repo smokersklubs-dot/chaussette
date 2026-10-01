@@ -7,6 +7,7 @@
 //   3. Fichiers JSON du dépôt (products/) : repli automatique si une source ne répond pas.
 const meta = (n) => (document.querySelector(`meta[name="${n}"]`)?.content || '').trim().replace(/\/$/, '');
 export const API = meta('sklubs-api');
+export const SHOP = meta('sklubs-shop'); // boutique WooCommerce (formulaire « Commander » vers son panier)
 export const SUPABASE = { url: meta('sklubs-supabase'), key: meta('sklubs-supabase-key') };
 const HAS_SUPABASE = !!(SUPABASE.url && SUPABASE.key);
 export const supabaseHeaders = () => ({ apikey: SUPABASE.key, Authorization: `Bearer ${SUPABASE.key}`, 'Content-Type': 'application/json' });

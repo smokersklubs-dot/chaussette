@@ -39,9 +39,14 @@ function sklubs_cfg_is_carrier($product_id) {
 
 // POST /sklubs/v1/cart : projet (intent order) -> panier WooCommerce
 function sklubs_cfg_add_to_cart(WP_REST_Request $r) {
-    if (!sklubs_cfg_wc_active()) return new WP_Error('no_shop', 'La boutique n\'est pas disponible : demandez un devis.', ['status' => 503]);
     $p = sklubs_cfg_parse_project($r);
     if (is_wp_error($p)) return $p;
+    return sklubs_cfg_cart_add($p);
+}
+
+// Ajout au panier d'un projet vérifié (API ou formulaire « Commander » venant du sous-domaine)
+function sklubs_cfg_cart_add(array $p) {
+    if (!sklubs_cfg_wc_active()) return new WP_Error('no_shop', 'La boutique n\'est pas disponible : demandez un devis.', ['status' => 503]);
     $product = sklubs_cfg_product_data($p['product_id']);
     if (!$product) return new WP_Error('not_found', 'Produit introuvable.', ['status' => 404]);
     $cfg = sklubs_cfg_config_from_project($product, $p);
@@ -173,3 +178,24 @@ add_action('woocommerce_after_order_itemmeta', function ($item_id, $item) {
     $url = $item->get_meta('Aperçu');
     if ($url) printf('<p><img src="%s" alt="" style="max-width:160px;border:1px solid #ddd;border-radius:6px"></p>', esc_url($url));
 }, 10, 2);
+
+// Formulaire « Commander » envoyé depuis bouteille.sklubs.fr (POST https://sklubs.fr/?sklubs-cart=1) :
+// navigation directe vers la boutique, donc le panier WooCommerce est bien celui du client.
+add_action('wp_loaded', function () {
+    if (!isset($_GET['sklubs-cart']) || ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !isset($_POST['sklubs_project'])) return;
+    $back = wp_get_referer() ?: home_url('/');
+    $fail = function ($msg) use ($back) {
+        wp_die('<p>' . esc_html($msg) . '</p><p><a href="' . esc_url($back) . '">← Retour au configurateur</a></p>', 'Commande impossible', ['response' => 400]);
+    };
+    if (!sklubs_cfg_origin_ok($_SERVER['HTTP_ORIGIN'] ?? '')) $fail('Origine non autorisée.');
+    $raw = wp_unslash($_POST['sklubs_project']);
+    if (strlen($raw) > SKLUBS_CFG_MAX_PROJECT) $fail('Projet trop volumineux.');
+    $p = json_decode($raw, true);
+    if (!is_array($p) || empty($p['product_id'])) $fail('Projet invalide.');
+    $p['product_id'] = sanitize_title($p['product_id']);
+    $res = sklubs_cfg_cart_add($p);
+    if (is_wp_error($res)) $fail($res->get_error_message());
+    nocache_headers();
+    wp_safe_redirect($res['redirect'], 303);
+    exit;
+}, 20);
