@@ -20,8 +20,8 @@
       "capacity": "TO_DEFINE_FACTORY",
       "confirmed": false,
       "printZone": {
-        "bottom": 0.08,
-        "top": 0.78
+        "bottom": 0.065,
+        "top": 0.825
       }
     }
   ],
@@ -94,7 +94,7 @@
     }
   },
   "colors": {
-    "_note": "Blanc et rouge : visuel Cricket. Les six autres : teintes échantillonnées sur la référence du master. Nuancier usine à confirmer.",
+    "_note": "Blanc et rouge : visuel Cricket. Les six autres : teintes échantillonnées sur la photo originale du produit. Nuancier usine à confirmer.",
     "catalog": [
       {
         "id": "white",
@@ -109,32 +109,32 @@
       {
         "id": "black",
         "label": "Noir",
-        "hex": "#171717"
+        "hex": "#202023"
       },
       {
         "id": "yellow",
         "label": "Jaune",
-        "hex": "#CFB40B"
+        "hex": "#E0C726"
       },
       {
         "id": "lightblue",
         "label": "Bleu clair",
-        "hex": "#78BEE1"
+        "hex": "#7BB1D2"
       },
       {
         "id": "orange",
         "label": "Orange",
-        "hex": "#D14A14"
+        "hex": "#DB6732"
       },
       {
         "id": "olive",
         "label": "Vert olive",
-        "hex": "#404330"
+        "hex": "#434638"
       },
       {
         "id": "pink",
         "label": "Rose",
-        "hex": "#ED899F"
+        "hex": "#E28195"
       }
     ],
     "defaults": {
@@ -281,10 +281,10 @@
   },
   "master": {
     "model": "bottle-master/export/SKLUBS_BOTTLE_WEB.glb",
-    "source": "bottle-master/ (reconstruction contrainte, validée par calque)",
+    "source": "bottle-master/ (v2 : reconstruction contrainte sur la photo originale, validée par calque)",
     "units": "BODY_HEIGHT = 1 (fond -> bas de la bague)",
-    "bodyRadius": 0.1963,
-    "totalHeight": 1.386,
+    "bodyRadius": 0.1617,
+    "totalHeight": 1.3205,
     "parts": {
       "body": [
         "BODY",
