@@ -2,15 +2,17 @@
 /**
  * Plugin Name: SKLUBS Configurateur
  * Description: Back-office des configurateurs 3D SKLUBS : produits, variantes, matières, couleurs, techniques de marquage, prix par paliers, catégories. Reçoit aussi les projets envoyés par les clients.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Requires PHP: 7.4
  * Author: SKLUBS
  *
- * Installation : copier le dossier sklubs-configurator dans wp-content/plugins/, puis l'activer.
+ * Installation : téléverser le ZIP (Extensions > Ajouter > Téléverser), puis l'activer.
+ * Le configurateur 3D est inclus (dossier site/) : la page « Configurateur 3D » est créée à l'activation,
+ * et le code court [sklubs_configurateur] l'affiche dans n'importe quelle page.
  */
 if (!defined('ABSPATH')) exit;
 
-define('SKLUBS_CFG_VERSION', '1.0.0');
+define('SKLUBS_CFG_VERSION', '1.1.0');
 define('SKLUBS_CFG_DIR', __DIR__);
 define('SKLUBS_CFG_URL', plugin_dir_url(__FILE__));
 const SKLUBS_CFG_NS = 'sklubs/v1';
@@ -93,6 +95,63 @@ function sklubs_cfg_seed() {
 }
 register_activation_hook(__FILE__, 'sklubs_cfg_seed');
 add_action('admin_init', 'sklubs_cfg_seed');
+register_activation_hook(__FILE__, 'sklubs_cfg_create_page');
+add_action('admin_init', 'sklubs_cfg_create_page');
+
+/* ---------- Configurateur 3D inclus (dossier site/) ---------- */
+
+// Adresse du configurateur : réglage (ex. hébergement Vercel) sinon la copie incluse dans l'extension
+function sklubs_cfg_app_url() {
+    $custom = trim((string) get_option('sklubs_cfg_configurator_url', ''));
+    if ($custom !== '') return trailingslashit($custom);
+    return file_exists(SKLUBS_CFG_DIR . '/site/index.html') ? SKLUBS_CFG_URL . 'site/' : '';
+}
+
+// Page « Configurateur 3D » créée une seule fois (si elle est supprimée ensuite, elle n'est pas recréée)
+function sklubs_cfg_create_page() {
+    if (get_option('sklubs_cfg_page_id') || !current_user_can('manage_options')) return;
+    $existing = get_page_by_path('configurateur-3d');
+    $id = $existing ? $existing->ID : wp_insert_post([
+        'post_type' => 'page', 'post_status' => 'publish', 'post_name' => 'configurateur-3d', 'post_title' => 'Configurateur 3D',
+        // bloc « pleine largeur » : le thème l'étend sur toute la page s'il le permet
+        'post_content' => "<!-- wp:group {\"align\":\"full\",\"layout\":{\"type\":\"default\"}} -->\n<div class=\"wp-block-group alignfull\"><!-- wp:shortcode -->\n[sklubs_configurateur]\n<!-- /wp:shortcode --></div>\n<!-- /wp:group -->",
+    ]);
+    if ($id && !is_wp_error($id)) update_option('sklubs_cfg_page_id', (int) $id, false);
+}
+
+// [sklubs_configurateur produit="cricket-bottle" hauteur="880" largeur="contenu|pleine"]
+add_shortcode('sklubs_configurateur', function ($atts) {
+    $a = shortcode_atts(['produit' => '', 'hauteur' => '880', 'largeur' => 'contenu'], $atts, 'sklubs_configurateur');
+    $base = sklubs_cfg_app_url();
+    if (!$base) return current_user_can('manage_options') ? '<p><strong>Configurateur SKLUBS :</strong> dossier site/ absent de l\'extension et aucune adresse dans Configurateur → Réglages.</p>' : '';
+    $produit = sanitize_title($a['produit']);
+    $src = $produit ? $base . 'configurateur.html?produit=' . rawurlencode($produit) : $base . 'index.html';
+    $src = add_query_arg('v', SKLUBS_CFG_VERSION, $src);
+    $h = max(560, (int) $a['hauteur']);
+    $full = $a['largeur'] === 'pleine' ? 'width:100vw;max-width:100vw;margin-left:calc(50% - 50vw);' : 'width:100%;';
+    $cfg = ['endpoint' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/project')), 'nonce' => wp_create_nonce('wp_rest')];
+    $id = 'sklubs-cfg-' . wp_rand(1000, 9999);
+    ob_start(); ?>
+    <div class="sklubs-cfg" style="<?php echo esc_attr($full); ?>position:relative;height:min(92vh,<?php echo (int) $h; ?>px);min-height:560px;overflow:hidden;background:#F6F6F4">
+      <iframe id="<?php echo esc_attr($id); ?>" src="<?php echo esc_url($src); ?>" title="Configurateur 3D SKLUBS" allow="fullscreen" style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+    </div>
+    <script>
+    (function () {
+      var frame = document.getElementById(<?php echo wp_json_encode($id); ?>);
+      var origin = new URL(frame.src, location.href).origin;
+      var cfg = <?php echo wp_json_encode($cfg); ?>;
+      window.addEventListener('message', function (e) {
+        if (e.origin !== origin || !e.data || e.data.type !== 'sklubs:bottle:project' || e.source !== frame.contentWindow) return;
+        fetch(cfg.endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce }, body: JSON.stringify(e.data.project) })
+          .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || r.status); return j; }); })
+          .then(function (j) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-received', reference: j.reference }, origin); })
+          .catch(function (err) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-error', message: 'Envoi impossible (' + err.message + '). Réessayez ou contactez SKLUBS.' }, origin); });
+      });
+    })();
+    </script>
+    <?php
+    return ob_get_clean();
+});
 
 /* ------------------------------------------------------------------ API REST */
 
@@ -283,7 +342,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
     wp_enqueue_script('sklubs-admin', SKLUBS_CFG_URL . 'admin/app.js', [], SKLUBS_CFG_VERSION, true);
     wp_localize_script('sklubs-admin', 'SKLUBS_ADMIN', [
         'root' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/')), 'nonce' => wp_create_nonce('wp_rest'),
-        'configuratorUrl' => (string) get_option('sklubs_cfg_configurator_url', 'https://bouteille.sklubs.fr/'),
+        'configuratorUrl' => (string) sklubs_cfg_app_url(),
         'template' => json_decode((string) @file_get_contents(SKLUBS_CFG_DIR . '/seed/template.json'), true),
     ]);
 });
@@ -293,14 +352,17 @@ function sklubs_cfg_settings_page() {
         update_option('sklubs_cfg_configurator_url', esc_url_raw(wp_unslash($_POST['sklubs_cfg_url'])), false);
         echo '<div class="notice notice-success"><p>Réglages enregistrés.</p></div>';
     }
-    $url = get_option('sklubs_cfg_configurator_url', 'https://bouteille.sklubs.fr/');
+    $url = get_option('sklubs_cfg_configurator_url', '');
     $api = rest_url(SKLUBS_CFG_NS);
+    $page = get_option('sklubs_cfg_page_id');
     ?>
     <div class="wrap"><h1>Réglages du configurateur</h1>
       <form method="post"><?php wp_nonce_field('sklubs_cfg_settings'); ?>
         <table class="form-table"><tr><th><label for="sklubs_cfg_url">Adresse du configurateur</label></th>
-          <td><input type="url" class="regular-text" id="sklubs_cfg_url" name="sklubs_cfg_url" value="<?php echo esc_attr($url); ?>" placeholder="https://bouteille.sklubs.fr/">
-          <p class="description">Sert aux liens « Voir dans le configurateur ».</p></td></tr>
+          <td><input type="url" class="regular-text" id="sklubs_cfg_url" name="sklubs_cfg_url" value="<?php echo esc_attr($url); ?>" placeholder="vide = configurateur inclus dans l'extension">
+          <p class="description">Laisser vide pour utiliser le configurateur inclus (<code><?php echo esc_html(SKLUBS_CFG_URL . 'site/'); ?></code>). Renseigner seulement si le configurateur est hébergé ailleurs (ex. https://bouteille.sklubs.fr/).</p></td></tr>
+          <tr><th>Page du site</th><td><?php echo $page && get_post_status($page) ? '<a href="' . esc_url(get_permalink($page)) . '" target="_blank">' . esc_html(get_permalink($page)) . '</a>' : '—'; ?>
+          <p class="description">Code court pour une autre page : <code>[sklubs_configurateur]</code> (accueil, tous les produits) ou <code>[sklubs_configurateur produit="cricket-bottle"]</code>.</p></td></tr>
           <tr><th>Adresse de l'API</th><td><code><?php echo esc_html($api); ?></code>
           <p class="description">À indiquer dans le configurateur (balise <code>&lt;meta name="sklubs-api"&gt;</code> de index.html et configurateur.html).</p></td></tr>
         </table><?php submit_button(); ?></form></div>

@@ -32,9 +32,11 @@ export async function loadProduct(id) {
 export const PARENT_ORIGINS = ['https://sklubs.fr', 'https://www.sklubs.fr', 'https://sklubs.com', 'https://www.sklubs.com'];
 export function detectParentOrigin() {
   if (window.parent === window) return null;
+  // la page parente peut aussi être sur le même domaine (configurateur servi par l'extension WordPress)
+  const allowed = [...PARENT_ORIGINS, location.origin];
   const candidates = [location.ancestorOrigins?.[0], (() => { try { return document.referrer ? new URL(document.referrer).origin : null; } catch { return null; } })()];
   for (const o of candidates) {
-    if (PARENT_ORIGINS.includes(o)) { try { sessionStorage.setItem('sklubs-parent', o); } catch { /* stockage bloqué */ } return o; }
+    if (allowed.includes(o)) { try { sessionStorage.setItem('sklubs-parent', o); } catch { /* stockage bloqué */ } return o; }
   }
-  try { const o = sessionStorage.getItem('sklubs-parent'); return PARENT_ORIGINS.includes(o) ? o : null; } catch { return null; }
+  try { const o = sessionStorage.getItem('sklubs-parent'); return allowed.includes(o) ? o : null; } catch { return null; }
 }

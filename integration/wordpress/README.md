@@ -9,28 +9,28 @@ WordPress (extension SKLUBS Configurateur)          Configurateur (Vercel)
   Admin → Configurateur → Projets    ◀──POST /project (via la page qui l'intègre)──
 ```
 
-## 1. Publier le configurateur
+## Méthode simple (recommandée) : tout dans WordPress
 
-Voir « Mettre en ligne » dans le `README.md` à la racine (Vercel, sous-domaine `bouteille.sklubs.fr` par exemple).
+L'extension contient le configurateur 3D (dossier `site/`). Pas besoin de Vercel ni de sous-domaine.
 
-## 2. Installer l'extension
+1. Construire le ZIP : `python3 tools/build_wp_plugin.py` → `dist/sklubs-configurator.zip`.
+2. WordPress : **Extensions → Ajouter → Téléverser une extension**, choisir le ZIP. Si l'extension est déjà
+   installée, WordPress propose **Remplacer l'actuelle par la version téléversée** : accepter.
+3. C'est tout : la page **Configurateur 3D** (`/configurateur-3d/`) est créée automatiquement
+   (une seule fois ; si vous la supprimez, elle n'est pas recréée).
 
-1. Zipper le dossier `sklubs-configurator/` puis **Extensions → Ajouter → Téléverser**,
-   ou le copier dans `wp-content/plugins/`.
-2. Activer **SKLUBS Configurateur**. La bouteille Cricket et les catégories sont créées automatiquement
-   (sans prix : aucun prix n'est inventé).
-3. **Configurateur → Réglages** : renseigner l'adresse du configurateur (bouton « Voir » de l'admin).
+Pour l'afficher dans une autre page : code court `[sklubs_configurateur]` (accueil, tous les produits) ou
+`[sklubs_configurateur produit="cricket-bottle"]`. Options : `hauteur="880"`, `largeur="pleine"`.
 
-## 3. Relier le configurateur à WordPress
+Après une mise à jour, vider le cache Cloudflare / de l'extension de cache si l'ancienne version reste affichée.
 
-C'est déjà fait dans le dépôt : `index.html` et `configurateur.html` contiennent
+## Variante : hébergement séparé (Vercel + bouteille.sklubs.fr)
 
-```html
-<meta name="sklubs-api" content="https://sklubs.fr/wp-json/sklubs/v1">
-```
-
-Tant que l'extension n'est pas installée (ou si l'API ne répond pas), le configurateur lit les fichiers
-`products/` du dépôt : rien ne casse. Vider la balise pour ne plus utiliser WordPress.
+1. Vercel : importer le dépôt `chaussette` (Framework **Other**), domaine `bouteille.sklubs.fr`.
+2. Cloudflare (DNS de sklubs.fr) : `CNAME bouteille → cname.vercel-dns.com`, **DNS only** (nuage gris).
+3. **Configurateur → Réglages** : adresse `https://bouteille.sklubs.fr/`. Le code court et la page utilisent
+   alors cette adresse. `index.html` et `configurateur.html` lisent déjà l'API `https://sklubs.fr/wp-json/sklubs/v1`.
+4. Ou coller `sklubs-bottle-embed.html` dans un bloc **HTML personnalisé**.
 
 ## 4. Gérer les produits (admin → Configurateur → Produits)
 

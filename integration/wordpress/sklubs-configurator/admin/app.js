@@ -129,7 +129,7 @@
       h('td', { class: 'sk-row-actions' },
         h('button', { class: 'button', onclick: () => openProduct(p.id) }, 'Modifier'),
         h('button', { class: 'button', onclick: () => duplicate(p.id) }, 'Dupliquer'),
-        A.configuratorUrl ? h('a', { class: 'button', target: '_blank', href: `${A.configuratorUrl.replace(/\/$/, '')}/configurateur?produit=${p.id}` }, 'Voir') : null,
+        A.configuratorUrl ? h('a', { class: 'button', target: '_blank', href: `${A.configuratorUrl.replace(/\/$/, '')}/configurateur.html?produit=${p.id}` }, 'Voir') : null,
         h('button', { class: 'button sk-danger', onclick: () => remove(p.id, p.name) }, 'Supprimer'))));
     const fileIn = h('input', { type: 'file', accept: 'application/json,.json', hidden: true, onchange: importJson });
     shell('Configurateur — produits', [

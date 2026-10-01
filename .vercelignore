@@ -5,3 +5,4 @@ bottle-master/export/*
 !bottle-master/export/SKLUBS_BOTTLE_WEB.glb
 integration
 tools
+dist/

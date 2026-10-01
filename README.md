@@ -10,7 +10,13 @@ Le modèle 3D affiché est le **master reconstruit et validé par calque** sur l
 (`bottle-master/`, voir son README). Le configurateur charge `bottle-master/export/SKLUBS_BOTTLE_WEB.glb`
 (compression Draco, décodeur chargé depuis le CDN de Three.js).
 
-## Mettre en ligne (Vercel)
+## Mettre en ligne
+
+**Le plus simple : dans WordPress.** `python3 tools/build_wp_plugin.py` produit `dist/sklubs-configurator.zip`
+(extension + configurateur inclus). Téléverser dans WordPress : la page `/configurateur-3d/` est créée.
+Voir `integration/wordpress/README.md`.
+
+### Variante Vercel
 
 1. Sur vercel.com : **Add New → Project**, importer le dépôt GitHub `smokersklubs-dot/chaussette`.
 2. Framework : **Other**. Pas de commande de build, dossier de sortie : racine.
