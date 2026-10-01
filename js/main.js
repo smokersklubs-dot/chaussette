@@ -1,9 +1,9 @@
 import { BottleViewer } from './viewer.js';
+import { loadProduct } from './data.js';
 import { ArtworkEngine } from './artwork.js';
 import { allowedFinishes, allowedMethods, allowedZones, computePrice, sanitize } from './pricing.js';
 
 const PRODUCT_ID = (new URLSearchParams(location.search).get('produit') || 'cricket-bottle').replace(/[^a-z0-9-]/gi, '');
-const PRODUCT_URL = `products/${PRODUCT_ID}/product.json`;
 // Point d'envoi direct (API) : optionnel. Sur le site, l'envoi passe par la page parente (voir integration/wordpress).
 const SUBMIT_ENDPOINT = null;
 // Pages autorisées à intégrer le configurateur et à recevoir les projets (postMessage)
@@ -53,9 +53,7 @@ init().catch((err) => {
 });
 
 async function init() {
-  const res = await fetch(PRODUCT_URL);
-  if (!res.ok) throw new Error(`Produit introuvable (${res.status})`);
-  product = await res.json();
+  product = await loadProduct(PRODUCT_ID).catch(() => { throw new Error('Produit introuvable'); });
 
   cfg = {
     size: product.defaultSize,
@@ -96,6 +94,7 @@ async function init() {
 }
 
 // ---------- Modèle ----------
+function masterOf(size) { return { ...product.master, ...(size?.master || {}) }; }
 function zoneWidth() { return artwork.pattern.circumference * (artwork.zone?.widthRatio || 1); }
 function ringLabel() { return product.ringFinishes.find((f) => f.id === cfg.colors.ring)?.label || '—'; }
 function currentSize() { return product.sizes.find((s) => s.id === cfg.size); }
@@ -111,7 +110,7 @@ function fmtLen(units, ref) {
 async function rebuildModel() {
   const size = currentSize();
   const S = SCALE();
-  const r = product.master.bodyRadius * S;
+  const r = masterOf(size).bodyRadius * S;
   artwork.setPattern(2 * Math.PI * r, (size.printZone.top - size.printZone.bottom) * S, product.safeMargin * S);
   artwork.setZone(product.printZones.find((z) => z.id === cfg.zone));
   await viewer.build(size, product, artwork);
@@ -260,15 +259,25 @@ function stepSize(body) {
   const g = group('Capacité');
   const opts = el('div', { class: 'options' });
   product.sizes.forEach((s) => {
+    const from = fromPrice(s.id);
+    const cap = s.capacity && s.capacity !== 'TO_DEFINE_FACTORY' ? s.capacity : 'capacité à confirmer';
     opts.append(el('button', {
       class: `opt ${cfg.size === s.id ? 'is-active' : ''}`,
       onclick: () => { cfg.size = s.id; update({ model: true }); renderStep(); },
     }, `<div class="t">${esc(s.label)}${flag(s.confirmed)}</div>
-        <span class="k">Capacité : à confirmer usine · master 3D validé sur la référence</span>`));
+        <span class="k">${esc(cap)}${from ? ` · à partir de ${fmtMoney(from, product.pricing?.currency)} / u` : ''}</span>`));
   });
   g.append(opts);
   body.append(g);
-  body.append(el('p', { class: 'note' }, 'Forme reconstruite au pixel près sur la photo de référence. Capacité, cotes et autres formats : à confirmer avec l\'usine.'));
+  if (product.sizes.length === 1) body.append(el('p', { class: 'note' }, 'Forme reconstruite sur la photo du produit. D\'autres capacités apparaîtront ici dès qu\'elles seront ajoutées au catalogue.'));
+}
+
+// prix unitaire le plus bas d'une variante (dernier palier, sans options) pour « à partir de »
+function fromPrice(sizeId) {
+  const t = product.pricing?.tiers?.[sizeId];
+  if (!Array.isArray(t)) return null;
+  const u = t.map((x) => Number(x.unit)).filter((x) => Number.isFinite(x) && x > 0);
+  return u.length ? Math.min(...u) : null;
 }
 
 function stepMaterial(body) {
@@ -554,27 +563,42 @@ function stepQuantity(body) {
   const g = group('Quantité');
   const q = el('div', { class: 'qty' });
   const input = el('input', { type: 'number', min: 1, step: 1, value: cfg.quantity, inputmode: 'numeric', 'aria-label': 'Quantité' });
-  const set = (v) => { cfg.quantity = Math.max(1, Math.round(v) || 1); input.value = cfg.quantity; update({ materials: false }); markPresets(); };
+  const set = (v) => { cfg.quantity = Math.max(1, Math.round(v) || 1); input.value = cfg.quantity; update({ materials: false }); markPresets(); markTiers(); };
+  const markTiers = () => body.querySelectorAll('.tier').forEach((t) => t.classList.toggle('is-active', computePrice(product, cfg).tiers?.find((x) => x.active)?.min === Number(t.dataset.q)));
   q.append(el('button', { 'aria-label': 'Moins', onclick: () => set(cfg.quantity - stepFor(cfg.quantity)) }, '−'), input,
     el('button', { 'aria-label': 'Plus', onclick: () => set(cfg.quantity + stepFor(cfg.quantity)) }, '+'));
   input.addEventListener('change', () => set(Number(input.value)));
   g.append(q, el('div', { class: 'qty-unit' }, 'pièces'));
   body.append(g);
 
-  const pg = group('Paliers');
-  const chips = el('div', { class: 'chips' });
-  product.quantity.presets.forEach((n) => chips.append(el('button', { class: 'chip', 'data-q': n, onclick: () => set(n) }, fmtInt(n))));
-  pg.append(chips);
-  body.append(pg);
-  const markPresets = () => chips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', Number(c.dataset.q) === cfg.quantity));
-  markPresets();
-
   const p = computePrice(product, cfg);
-  const moq = product.quantity.moq;
+  const pg = group('Paliers de prix', p.leadTime ? `<b>Délai : ${esc(p.leadTime)}</b>` : '');
+  const tiers = product.pricing?.tiers?.[cfg.size];
+  let markPresets = () => {};
+  if (p.tiers && p.tiers.length) {
+    const tbl = el('div', { class: 'tiers', role: 'list' });
+    const popular = (tiers || []).find((t) => t.popular)?.min;
+    p.tiers.forEach((t) => {
+      tbl.append(el('button', { class: `tier ${t.active ? 'is-active' : ''}`, role: 'listitem', 'data-q': t.min, onclick: () => { set(t.min); renderStep(); } },
+        `<span class="q">${fmtInt(t.min)} pcs${t.min === popular ? ' <span class="pop">le plus choisi</span>' : ''}</span>
+         <span class="u">${t.unit !== null ? fmtMoney(t.unit, p.currency) : '—'} <small>/ u</small></span>
+         <span class="sv">${t.saving > 0.005 ? `−${Math.round(t.saving * 100)} %` : ''}</span>`));
+    });
+    pg.append(tbl);
+    if (p.setup) pg.append(el('p', { class: 'note' }, `Frais de calage du marquage inclus et répartis : ${fmtMoney(p.setup, p.currency, 0)} au total.`));
+  } else {
+    const chips = el('div', { class: 'chips' });
+    (product.quantity.presets || []).forEach((n) => chips.append(el('button', { class: 'chip', 'data-q': n, onclick: () => set(n) }, fmtInt(n))));
+    pg.append(chips);
+    markPresets = () => chips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', Number(c.dataset.q) === cfg.quantity));
+    markPresets();
+  }
+  body.append(pg);
+
   body.append(el('p', { class: `note ${p.status === 'factory' ? 'warn' : ''}` },
     p.status === 'factory'
-      ? `Tarifs usine non encore renseignés${moq === 'TO_DEFINE' ? ' (MOQ inclus)' : ''} : votre projet sera chiffré par SKLUBS après validation. Aucun prix n'est affiché tant qu'il n'est pas confirmé.`
-      : p.belowMoq ? `Minimum de commande : ${fmtInt(moq)} pièces.` : ''));
+      ? (p.belowMoq && p.moq ? `Minimum de commande : ${fmtInt(p.moq)} pièces.` : 'Tarifs non encore renseignés pour cette configuration : votre projet sera chiffré par SKLUBS après validation. Aucun prix n\'est affiché tant qu\'il n\'est pas confirmé.')
+      : p.status === 'estimated' ? 'Prix estimé : confirmé par SKLUBS après validation du fichier.' : ''));
   if (product.reference?.quantity) body.append(el('p', { class: 'note' }, `Référence devis Cricket : ${fmtInt(product.reference.quantity)} pièces.`));
 }
 const stepFor = (q) => (q < 100 ? 10 : q < 1000 ? 50 : 250);
@@ -601,7 +625,8 @@ function enterReview() {
   const p = computePrice(product, cfg);
   $('#reviewPrice').innerHTML = p.status === 'factory'
     ? `<div class="row"><span class="status factory">${STATUS.factory}</span></div><p>Cette configuration sera chiffrée par SKLUBS. Envoyez le projet : aperçu, visuel et paramètres sont joints.</p>`
-    : `<div class="row"><span>Prix / unité</span><b>${fmtMoney(p.unit, p.currency)}</b></div><div class="row"><span>Total</span><b>${fmtMoney(p.total, p.currency, 0)}</b></div><p>${STATUS[p.status]}</p>`;
+    : `<div class="row"><span>Prix / unité</span><b>${fmtMoney(p.unit, p.currency)}</b></div><div class="row"><span>Total</span><b>${fmtMoney(p.total, p.currency, 0)}</b></div>`
+      + `<p>${STATUS[p.status]}${p.saving > 0.005 ? ` · économie de ${Math.round(p.saving * 100)} % par rapport au premier palier` : ''}${p.leadTime ? ` · délai ${esc(p.leadTime)}` : ''}</p>`;
   $('#sendBtn').textContent = p.status === 'factory' ? 'Envoyer à SKLUBS' : 'Demander le devis';
   viewer.setGuides(false);
   $('#guidesBtn').setAttribute('aria-pressed', 'false');

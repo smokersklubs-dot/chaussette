@@ -1,10 +1,10 @@
-// Page d'accueil : catalogue piloté par products/catalog.json
+// Page d'accueil : catalogue piloté par l'API WordPress ou products/catalog.json
+import { loadCatalog } from './data.js';
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ARROW = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
-const res = await fetch('products/catalog.json');
-const catalog = await res.json();
+const catalog = await loadCatalog();
 const params = new URLSearchParams(location.search);
 let active = params.get('categorie') || 'all';
 

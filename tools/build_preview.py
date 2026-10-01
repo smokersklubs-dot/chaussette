@@ -20,7 +20,7 @@ json.dump(p, open(os.path.join(OUT, 'products', 'cricket-bottle', 'product.json'
 
 # JS : un seul module en ligne (imports relatifs retirés, exports déclassés)
 js = ''
-for f in ('pricing.js', 'artwork.js', 'viewer.js', 'main.js'):
+for f in ('pricing.js', 'artwork.js', 'viewer.js', 'data.js', 'main.js'):
     s = open(os.path.join(ROOT, 'js', f)).read()
     s = re.sub(r"^import [^;]*from '\./[^']+';\n", '', s, flags=re.M)
     s = re.sub(r'^export ', '', s, flags=re.M)

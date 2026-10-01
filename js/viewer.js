@@ -116,7 +116,8 @@ export class BottleViewer {
 
   // ---------- Géométrie : master 3D validé (bottle-master/) ----------
   async loadMaster(url) {
-    if (this.masterScene) return this.masterScene;
+    this.masterCache = this.masterCache || new Map();
+    if (this.masterCache.has(url)) return this.masterCache.get(url);
     const loader = new GLTFLoader();
     let gltf;
     if (url.endsWith('.b64.txt')) {
@@ -134,13 +135,13 @@ export class BottleViewer {
       loader.setDRACOLoader(draco);
       gltf = await loader.loadAsync(url);
     }
-    this.masterScene = gltf.scene;
-    return this.masterScene;
+    this.masterCache.set(url, gltf.scene);
+    return gltf.scene;
   }
 
   async build(size, product, artwork) {
     const S = product.scale.sceneUnitsPerBodyHeight;
-    const M = product.master;
+    const M = { ...product.master, ...(size.master || {}) };  // une variante peut avoir son propre modèle 3D
     const root = await this.loadMaster(M.model);
     this.group.clear();
     const model = root.clone(true);

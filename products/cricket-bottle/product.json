@@ -277,6 +277,9 @@
     "ringSurcharge": {
       "polished": null,
       "black": null
+    },
+    "tiers": {
+      "master": []
     }
   },
   "master": {
@@ -328,5 +331,20 @@
     }
   ],
   "_unavailable": "Aluminium, Tritan, verre et autres capacités : pas de master 3D ni de donnée usine pour ce modèle. TO_DEFINE_FACTORY.",
-  "safeMargin": 0.015
+  "safeMargin": 0.015,
+  "card": {
+    "subtitle": "Inox double paroi · anse sangle · bague inox",
+    "capacity": "à confirmer",
+    "material": "Inox double paroi",
+    "thumbnail": "products/cricket-bottle/thumbnail.webp",
+    "tags": [
+      "Gravure laser",
+      "UV",
+      "Wrap 360°"
+    ],
+    "order": 1
+  },
+  "production": {
+    "leadTime": null
+  }
 }
