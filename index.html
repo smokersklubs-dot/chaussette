@@ -5,33 +5,106 @@
   <!-- API produits (extension WordPress « SKLUBS Configurateur ») : vide = fichiers du dépôt -->
   <meta name="sklubs-api" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>SKLUBS — Configurateurs drinkware</title>
-  <meta name="description" content="Choisissez un produit et personnalisez-le en 3D : bouteilles, tumblers, mugs, thermos, gobelets.">
+  <title>SKLUBS — Custom drinkware</title>
+  <meta name="description" content="Gourdes, tumblers, mugs et plus, personnalisés en 3D pour votre marque. Choisissez un produit, configurez-le, obtenez votre prix.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@1&family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="home.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
-<body>
-  <header class="h-top">
-    <a class="wordmark" href="./">SKLUBS</a>
-    <span class="crumb">Drinkware</span>
+<body class="hp-body">
+<div class="hp">
+  <header class="hp-top">
+    <a class="hp-wordmark" href="./">SKLUBS</a>
+    <nav class="hp-nav" aria-label="Navigation principale">
+      <a href="#types">Produits</a>
+      <a href="#modeles">Modèles</a>
+      <a href="#etapes">Comment ça marche</a>
+    </nav>
+    <a class="hp-top-cta" data-config href="configurateur.html">Configurateur</a>
   </header>
-  <main class="h-main">
-    <section class="h-hero">
-      <p class="eyebrow">Configurateur drinkware</p>
-      <h1>Qu'est-ce qu'on fabrique&nbsp;?</h1>
-      <p class="lede">Choisissez un produit. Vous le personnalisez ensuite en 3D : matière, couleurs, marquage, quantité.</p>
+
+  <main>
+    <!-- 01 · Accueil -->
+    <section class="hp-hero" aria-labelledby="hp-title">
+      <div class="hp-hero-copy">
+        <h1 id="hp-title"><b>Custom</b> <b>drinkware</b> <span>for a brighter</span> <em>tomorrow.</em></h1>
+        <p class="hp-lede">Gourdes, tumblers, mugs et plus.<br>Personnalisation haute qualité pour votre marque.</p>
+        <a class="hp-cta" data-config href="configurateur.html">Configurer ma bouteille <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <ul class="hp-trust">
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 2 3.3-.2.9 3.2 2.7 1.9-1.2 3.1 1.2 3.1-2.7 1.9-.9 3.2-3.3-.2L12 21l-2.6-2-3.3.2-.9-3.2-2.7-1.9L3.7 11 2.5 7.9l2.7-1.9.9-3.2 3.3.2z"/><path d="M8.5 12l2.4 2.4 4.6-4.8"/></svg>Qualité<br>professionnelle</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.5-1 10-10a2.1 2.1 0 00-3-3l-10 10z"/><path d="M13.5 7.5l3 3"/></svg>Personnalisation<br>totale</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>Faible<br>MOQ</li>
+          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13a8 8 0 0116 0"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M19 19c0 1.5-2 2-5 2"/></svg>Support<br>expert</li>
+        </ul>
+      </div>
+      <div class="hp-hero-stage">
+        <div class="hp-bottle" id="heroBottle" role="img" aria-label="Bouteille personnalisée en 3D"></div>
+        <p class="hp-stage-note" id="heroNote"></p>
+      </div>
+      <div class="hp-rail-wrap">
+        <div class="hp-rail" id="heroRail" role="radiogroup" aria-label="Couleur du corps"></div>
+        <p class="hp-count" id="heroCount"></p>
+      </div>
     </section>
-    <nav class="h-cats" id="cats" aria-label="Catégories"></nav>
-    <section class="h-grid" id="grid" aria-live="polite"></section>
-    <p class="h-empty" id="empty" hidden></p>
-    <section id="soon" aria-label="Produits à venir"></section>
+
+    <!-- 02 · Type de produit -->
+    <section class="hp-section" id="types" aria-labelledby="types-title">
+      <header class="hp-head">
+        <h2 id="types-title">Choisissez votre type de drinkware</h2>
+        <p>Différents produits pour différents besoins.</p>
+      </header>
+      <div class="hp-types" id="typeGrid" role="radiogroup" aria-label="Type de produit"></div>
+    </section>
+
+    <!-- 03 · Modèle -->
+    <section class="hp-section" id="modeles" aria-labelledby="models-title">
+      <header class="hp-head">
+        <h2 id="models-title">Choisissez votre modèle</h2>
+        <p id="modelsSub"></p>
+      </header>
+      <div class="hp-models" id="models">
+        <div class="hp-mrail" id="modelRail" aria-label="Modèles"></div>
+        <div class="hp-mstage">
+          <div class="hp-bottle" id="modelBottle" role="img" aria-label="Modèle en 3D, glisser pour tourner"></div>
+          <button class="hp-arrow prev" id="prevModel" aria-label="Modèle précédent"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+          <button class="hp-arrow next" id="nextModel" aria-label="Modèle suivant"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          <p class="hp-mcount" id="modelCount"></p>
+          <p class="hp-drag">Glisser pour tourner</p>
+        </div>
+        <article class="hp-mcard" id="modelCard" aria-live="polite"></article>
+      </div>
+      <p class="hp-soon-msg" id="soonMsg" hidden></p>
+    </section>
+
+    <!-- Parcours -->
+    <section class="hp-section" id="etapes" aria-labelledby="steps-title">
+      <header class="hp-head">
+        <h2 id="steps-title">De l'idée à la production</h2>
+        <p>Tout se règle en 3D, avec le prix en temps réel.</p>
+      </header>
+      <ol class="hp-steps">
+        <li><span>01</span><b>Matière &amp; couleur</b><small>Corps, bouchon, anse et bague, chacun dans sa couleur.</small></li>
+        <li><span>02</span><b>Marquage</b><small>Logo, texte ou visuel, placé directement sur la bouteille.</small></li>
+        <li><span>03</span><b>Quantité &amp; prix</b><small>Prix unitaire par palier, délai de production.</small></li>
+        <li><span>04</span><b>Projet</b><small>Envoyez le projet, l'équipe SKLUBS valide avec l'usine.</small></li>
+      </ol>
+    </section>
   </main>
-  <footer class="h-foot">
-    <span>Rendus 3D issus de masters reconstruits sur photo produit.</span>
-    <span>Prix et délais confirmés par SKLUBS après validation usine.</span>
+
+  <footer class="hp-foot">
+    <span class="hp-wordmark">SKLUBS</span>
+    <span>Rendus 3D issus de masters reconstruits sur photo produit. Prix et délais confirmés par SKLUBS après validation usine.</span>
   </footer>
-  <script type="module" src="js/home.js"></script>
+</div>
+<script type="module" src="js/home.js"></script>
 </body>
 </html>

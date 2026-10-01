@@ -3,7 +3,18 @@ import { loadProduct } from './data.js';
 import { ArtworkEngine } from './artwork.js';
 import { allowedFinishes, allowedMethods, allowedZones, computePrice, sanitize } from './pricing.js';
 
-const PRODUCT_ID = (new URLSearchParams(location.search).get('produit') || 'cricket-bottle').replace(/[^a-z0-9-]/gi, '');
+// ?produit=<id> ; couleurs de départ choisies sur l'accueil : &couleur=, &bouchon=, &anse= (HEX sans #)
+// La page d'aperçu (une seule page) fournit ces paramètres dans window.SKLUBS_PREVIEW_PARAMS.
+const params = () => new URLSearchParams(window.SKLUBS_PREVIEW_PARAMS ?? location.search);
+let PRODUCT_ID;
+function colorsFromUrl() {
+  const p = params(), out = {};
+  for (const [key, part] of [['couleur', 'body'], ['bouchon', 'cap'], ['anse', 'handle']]) {
+    const v = (p.get(key) || '').replace(/^#/, '');
+    if (/^[0-9a-f]{6}$/i.test(v)) out[part] = `#${v.toUpperCase()}`;
+  }
+  return out;
+}
 // Point d'envoi direct (API) : optionnel. Sur le site, l'envoi passe par la page parente (voir integration/wordpress).
 const SUBMIT_ENDPOINT = null;
 // Pages autorisées à intégrer le configurateur et à recevoir les projets (postMessage)
@@ -52,14 +63,23 @@ init().catch((err) => {
   $('#loading').innerHTML = `<b style="color:#111">Le configurateur n'a pas pu démarrer.</b><small>${esc(err.message)}</small>`;
 });
 
+// page d'aperçu : réouverture du configurateur avec d'autres couleurs choisies sur l'accueil
+window.SKLUBS_APPLY_URL_COLORS = () => {
+  if (!cfg || !viewer) return;
+  Object.assign(cfg.colors, colorsFromUrl());
+  renderStep();
+  update();
+};
+
 async function init() {
+  PRODUCT_ID = (params().get('produit') || 'cricket-bottle').replace(/[^a-z0-9-]/gi, '');
   product = await loadProduct(PRODUCT_ID).catch(() => { throw new Error('Produit introuvable'); });
 
   cfg = {
     size: product.defaultSize,
     material: product.defaultMaterial,
     finish: null,
-    colors: { ...product.colors.defaults },
+    colors: { ...product.colors.defaults, ...colorsFromUrl() },
     colorRefs: { body: '', cap: '', handle: '' },
     method: 'uv',
     zone: 'front',

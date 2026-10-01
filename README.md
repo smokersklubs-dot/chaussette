@@ -41,7 +41,7 @@ Un serveur HTTP est nécessaire (le produit est chargé depuis un fichier JSON).
 
 ## Pages
 
-- `index.html` : accueil, liste des produits par catégorie (API WordPress ou `products/catalog.json`).
+- `index.html` : accueil — hero 3D (bouteille SKLUBS, choix de couleur), choix du type de drinkware, choix du modèle en 3D, parcours. Données : API WordPress ou `products/catalog.json`.
 - `configurateur.html?produit=<id>` : configurateur 3D du produit `<id>` (API WordPress ou `products/<id>/product.json`).
 
 **Ajouter un modèle** : depuis l'admin WordPress (« Dupliquer » ou « Nouveau produit »), ou sans WordPress : créer `products/<id>/product.json` (même structure que `cricket-bottle`), sa vignette
@@ -75,7 +75,9 @@ Mobile : viewer en haut, panneau en bottom sheet (replié, moyen, plein écran).
 | `js/data.js` | Lecture du catalogue et des produits : API WordPress, sinon fichiers du dépôt |
 | `integration/wordpress/sklubs-configurator/` | Extension WordPress : back-office, API, projets clients |
 | `js/main.js` | Étapes, état, récapitulatif, export projet, bottom sheet, envoi au site |
-| `js/home.js`, `home.css` | Accueil : catalogue, filtres par catégorie, transition vers le configurateur |
+| `js/home.js`, `home.css` | Accueil : hero, types de produit, modèles, lien vers le configurateur avec la couleur choisie |
+| `js/hero3d.js` | Bouteille 3D de l'accueil (couleurs, logo, animation légère) |
+| `js/glb.js` | Chargement partagé des masters 3D (accueil et configurateur) |
 | `products/catalog.json` | Catégories et modèles affichés à l'accueil |
 
 ## Données à fournir (TO_DEFINE)

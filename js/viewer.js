@@ -2,8 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { loadGLB } from './glb.js';
 
 const ENGRAVE = {
   coated: { color: '#c9cac7', metalness: 0.95, roughness: 0.32 }, // peinture retirée → inox apparent
@@ -115,38 +114,10 @@ export class BottleViewer {
   }
 
   // ---------- Géométrie : master 3D validé (bottle-master/) ----------
-  async loadMaster(url) {
-    this.masterCache = this.masterCache || new Map();
-    if (this.masterCache.has(url)) return this.masterCache.get(url);
-    const loader = new GLTFLoader();
-    let gltf;
-    if (url.endsWith('.b64.txt')) {
-      // GLB encodé en base64 dans un fichier texte : pour les hébergeurs qui ne servent pas .glb
-      // et bloquent les URI data: (page d'aperçu). Décodé ici, puis analysé sans requête réseau.
-      let text = window.SKLUBS_INLINE?.[url];
-      if (!text) {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Modèle 3D introuvable (${res.status})`);
-        text = await res.text();
-      }
-      const bin = atob(text.trim());
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      gltf = await new Promise((resolve, reject) => loader.parse(bytes.buffer, '', resolve, reject));
-    } else {
-      const draco = new DRACOLoader();
-      draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/draco/gltf/');
-      loader.setDRACOLoader(draco);
-      gltf = await loader.loadAsync(url);
-    }
-    this.masterCache.set(url, gltf.scene);
-    return gltf.scene;
-  }
-
   async build(size, product, artwork) {
     const S = product.scale.sceneUnitsPerBodyHeight;
     const M = { ...product.master, ...(size.master || {}) };  // une variante peut avoir son propre modèle 3D
-    const root = await this.loadMaster(M.model);
+    const root = await loadGLB(M.model);
     this.group.clear();
     const model = root.clone(true);
     model.scale.setScalar(S);
