@@ -33,7 +33,7 @@
 .hp-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) auto; align-items: center; gap: 24px;
   min-height: min(calc(100svh - 64px), 820px); padding: 12px var(--hp-gutter) 40px;
   background: radial-gradient(70% 70% at 62% 45%, #FFFFFF 0%, rgba(255,255,255,0) 70%); }
-.hp-hero h1 { font-weight: 800; font-size: clamp(44px, 6.6vw, 104px); line-height: .9; letter-spacing: -.035em; text-transform: uppercase; }
+.hp-hero h1 { font-weight: 800; font-size: clamp(38px, 4.9vw, 78px); line-height: .9; letter-spacing: -.035em; text-transform: uppercase; }
 .hp-hero h1 b, .hp-hero h1 span, .hp-hero h1 em { display: block; }
 .hp-hero h1 b { font-weight: 800; }
 .hp-hero h1 span { font-weight: 400; letter-spacing: -.03em; }
@@ -162,7 +162,7 @@
   .hp-rail-wrap { order: 3; justify-content: flex-start; margin: 0 calc(-1 * var(--hp-gutter)); padding-inline: var(--hp-gutter); }
   .hp-rail { border-radius: 16px; }
   .hp-swatch { width: 46px; height: 56px; }
-  .hp-hero h1 { font-size: clamp(40px, 12.4vw, 64px); }
+  .hp-hero h1 { font-size: clamp(30px, 8.9vw, 52px); }
   .hp-lede { margin-top: 18px; }
   .hp-cta { width: 100%; justify-content: space-between; }
   .hp-trust { margin-top: 28px; gap: 16px 12px; }

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SKLUBS Configurateur
  * Description: Back-office des configurateurs 3D SKLUBS : produits, variantes, matières, couleurs, techniques de marquage, prix par paliers, catégories. Reçoit aussi les projets envoyés par les clients.
- * Version: 1.2.1
+ * Version: 1.2.2
  * Requires PHP: 7.4
  * Author: SKLUBS
  *
@@ -12,7 +12,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-define('SKLUBS_CFG_VERSION', '1.2.1');
+define('SKLUBS_CFG_VERSION', '1.2.2');
 define('SKLUBS_CFG_DIR', __DIR__);
 define('SKLUBS_CFG_URL', plugin_dir_url(__FILE__));
 const SKLUBS_CFG_NS = 'sklubs/v1';
