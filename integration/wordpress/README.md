@@ -9,8 +9,8 @@ bouteille.sklubs.fr (Vercel, pleine page, sans iframe)        sklubs.fr (WordPre
 - **Données** : dans WordPress (extension « SKLUBS Configurateur ») : produits, variantes, matières, couleurs,
   techniques, paliers de prix, délai, catégories, projets clients. Admin : menu **Configurateur**.
 - **Configurateur** : uniquement sur **https://bouteille.sklubs.fr** (projet Vercel `sklubs-configurateur`).
-  La page `sklubs.fr/configurateur-3d/` redirige vers lui ; le code court `[sklubs_configurateur]` affiche un
-  bouton vers lui (`produit="cricket-bottle"` pour ouvrir directement un modèle, `texte="…"` pour le libellé).
+  Le code court `[sklubs_configurateur]` affiche un bouton vers lui (l'ancienne page `/configurateur-3d/` est mise
+  à la corbeille par la version 1.3.1) (`produit="cricket-bottle"` pour ouvrir directement un modèle, `texte="…"` pour le libellé).
 - **Lecture des données** : `vercel.json` relaie `/wp-json/sklubs/v1/*` vers sklubs.fr (l'hébergement de sklubs.fr
   retire l'en-tête CORS pour les autres domaines ; le relais évite le problème).
 - **Devis** : envoyés à `/wp-json/sklubs/v1/project` (origine *.sklubs.fr vérifiée), visibles dans

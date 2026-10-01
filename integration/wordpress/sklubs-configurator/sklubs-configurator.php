@@ -2,17 +2,17 @@
 /**
  * Plugin Name: SKLUBS Configurateur
  * Description: Back-office des configurateurs 3D SKLUBS : produits, variantes, matières, couleurs, techniques de marquage, prix par paliers, catégories. Reçoit aussi les projets envoyés par les clients.
- * Version: 1.3.0
+ * Version: 1.3.1
  * Requires PHP: 7.4
  * Author: SKLUBS
  *
  * Installation : téléverser le ZIP (Extensions > Ajouter > Téléverser), puis l'activer.
- * Le configurateur 3D est sur son sous-domaine (https://bouteille.sklubs.fr, pleine page) : la page
- * « Configurateur 3D » du site y redirige, le code court [sklubs_configurateur] affiche un bouton vers lui.
+ * Le configurateur 3D est sur son sous-domaine (https://bouteille.sklubs.fr, pleine page) ; le code court
+ * [sklubs_configurateur] affiche un bouton vers lui.
  */
 if (!defined('ABSPATH')) exit;
 
-define('SKLUBS_CFG_VERSION', '1.3.0');
+define('SKLUBS_CFG_VERSION', '1.3.1');
 define('SKLUBS_CFG_DIR', __DIR__);
 define('SKLUBS_CFG_URL', plugin_dir_url(__FILE__));
 const SKLUBS_CFG_NS = 'sklubs/v1';
@@ -97,8 +97,7 @@ function sklubs_cfg_seed() {
 }
 register_activation_hook(__FILE__, 'sklubs_cfg_seed');
 add_action('admin_init', 'sklubs_cfg_seed');
-register_activation_hook(__FILE__, 'sklubs_cfg_create_page');
-add_action('admin_init', 'sklubs_cfg_create_page');
+add_action('admin_init', 'sklubs_cfg_remove_page');
 
 /* ---------- Supabase (base de données principale) ---------- */
 
@@ -160,23 +159,17 @@ function sklubs_cfg_app_link($produit = '') {
     return $produit ? $base . 'configurateur?produit=' . rawurlencode(sanitize_title($produit)) : $base;
 }
 
-// La page « Configurateur 3D » du site renvoie vers le sous-domaine
-add_action('template_redirect', function () {
-    $page = (int) get_option('sklubs_cfg_page_id');
-    if ($page && is_page($page)) { wp_redirect(sklubs_cfg_app_link(), 302); exit; }
-});
 
-// Page « Configurateur 3D » créée une seule fois (si elle est supprimée ensuite, elle n'est pas recréée)
-function sklubs_cfg_create_page() {
-    if (get_option('sklubs_cfg_page_id') || !current_user_can('manage_options')) return;
-    $existing = get_page_by_path('configurateur-3d');
-    $id = $existing ? $existing->ID : wp_insert_post([
-        'post_type' => 'page', 'post_status' => 'publish', 'post_name' => 'configurateur-3d', 'post_title' => 'Configurateur 3D',
-        // bloc « pleine largeur » : le thème l'étend sur toute la page s'il le permet
-        // la page redirige vers le sous-domaine ; le bouton sert si la redirection est désactivée
-        'post_content' => "<!-- wp:shortcode -->\n[sklubs_configurateur]\n<!-- /wp:shortcode -->",
-    ]);
-    if ($id && !is_wp_error($id)) update_option('sklubs_cfg_page_id', (int) $id, false);
+// Ancienne page « Configurateur 3D » (créée par les versions 1.1 à 1.3.0) : mise à la corbeille, une seule fois.
+// Le configurateur est sur son sous-domaine ; la page n'est plus utile.
+function sklubs_cfg_remove_page() {
+    $id = (int) get_option('sklubs_cfg_page_id');
+    if (!$id || !current_user_can('manage_options')) return;
+    $post = get_post($id);
+    if ($post && $post->post_type === 'page' && $post->post_status !== 'trash' && strpos($post->post_content, '[sklubs_configurateur') !== false) {
+        wp_trash_post($id);
+    }
+    delete_option('sklubs_cfg_page_id');
 }
 
 // [sklubs_configurateur produit="cricket-bottle" texte="Configurer ma bouteille en 3D"] : bouton vers le sous-domaine (pas d'iframe)
@@ -444,15 +437,13 @@ function sklubs_cfg_settings_page() {
     }
     $url = get_option('sklubs_cfg_configurator_url', '');
     $api = rest_url(SKLUBS_CFG_NS);
-    $page = get_option('sklubs_cfg_page_id');
     ?>
     <div class="wrap"><h1>Réglages du configurateur</h1>
       <form method="post"><?php wp_nonce_field('sklubs_cfg_settings'); ?>
         <table class="form-table"><tr><th><label for="sklubs_cfg_url">Adresse du configurateur</label></th>
           <td><input type="url" class="regular-text" id="sklubs_cfg_url" name="sklubs_cfg_url" value="<?php echo esc_attr($url); ?>" placeholder="<?php echo esc_attr(SKLUBS_CFG_DEFAULT_APP); ?>">
-          <p class="description">Vide = <code><?php echo esc_html(SKLUBS_CFG_DEFAULT_APP); ?></code>. La page « Configurateur 3D » et le bouton <code>[sklubs_configurateur]</code> y mènent (pleine page, sans iframe).</p></td></tr>
-          <tr><th>Page du site</th><td><?php echo $page && get_post_status($page) ? '<a href="' . esc_url(get_permalink($page)) . '" target="_blank">' . esc_html(get_permalink($page)) . '</a>' : '—'; ?>
-          <p class="description">Code court pour une autre page : <code>[sklubs_configurateur]</code> (accueil, tous les produits) ou <code>[sklubs_configurateur produit="cricket-bottle"]</code>.</p></td></tr>
+          <p class="description">Vide = <code><?php echo esc_html(SKLUBS_CFG_DEFAULT_APP); ?></code>. Le bouton <code>[sklubs_configurateur]</code> y mène (pleine page, sans iframe).</p></td></tr>
+          <tr><th>Bouton</th><td><p class="description">Code court à placer dans une page : <code>[sklubs_configurateur]</code> (accueil, tous les produits) ou <code>[sklubs_configurateur produit="cricket-bottle"]</code>.</p></td></tr>
           <?php $sb = sklubs_cfg_supabase(); ?>
           <tr><th><label for="sklubs_cfg_sb_url">Supabase</label></th><td>
             <input type="url" class="regular-text" id="sklubs_cfg_sb_url" name="sklubs_cfg_sb_url" value="<?php echo esc_attr(get_option('sklubs_cfg_sb_url', '')); ?>" placeholder="<?php echo esc_attr($sb['url'] ?? 'https://xxxx.supabase.co'); ?>"><br>
