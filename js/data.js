@@ -4,6 +4,9 @@
 const API = (document.querySelector('meta[name="sklubs-api"]')?.content || '').trim().replace(/\/$/, '');
 
 async function getJson(url) {
+  // page d'aperçu autonome : données intégrées dans la page (voir tools/build_preview.py)
+  const inline = window.SKLUBS_INLINE?.[url];
+  if (inline) return JSON.parse(inline);
   const r = await fetch(url, { credentials: 'omit' });
   if (!r.ok) throw new Error(`${url} : ${r.status}`);
   return r.json();

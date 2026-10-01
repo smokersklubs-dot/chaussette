@@ -123,9 +123,13 @@ export class BottleViewer {
     if (url.endsWith('.b64.txt')) {
       // GLB encodé en base64 dans un fichier texte : pour les hébergeurs qui ne servent pas .glb
       // et bloquent les URI data: (page d'aperçu). Décodé ici, puis analysé sans requête réseau.
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Modèle 3D introuvable (${res.status})`);
-      const bin = atob((await res.text()).trim());
+      let text = window.SKLUBS_INLINE?.[url];
+      if (!text) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Modèle 3D introuvable (${res.status})`);
+        text = await res.text();
+      }
+      const bin = atob(text.trim());
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       gltf = await new Promise((resolve, reject) => loader.parse(bytes.buffer, '', resolve, reject));
