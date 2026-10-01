@@ -1,0 +1,20 @@
+{
+ "blue": {
+  "angle_deg": -1.746,
+  "axis_x_at_900": 621.51,
+  "crop_x0": 432,
+  "cx_in_crop": 189.51
+ },
+ "pink": {
+  "angle_deg": -3.448,
+  "axis_x_at_900": 909.77,
+  "crop_x0": 720,
+  "cx_in_crop": 189.77
+ },
+ "black": {
+  "angle_deg": -1.099,
+  "axis_x_at_900": 388.53,
+  "crop_x0": 199,
+  "cx_in_crop": 189.53
+ }
+}

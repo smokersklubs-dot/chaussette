@@ -1,0 +1,7 @@
+# Seuls le site et le modèle web sont publiés ; les fichiers de travail Blender restent dans le dépôt.
+bottle-master/*
+!bottle-master/export
+bottle-master/export/*
+!bottle-master/export/SKLUBS_BOTTLE_WEB.glb
+integration
+tools

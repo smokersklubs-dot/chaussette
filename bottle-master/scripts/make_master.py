@@ -12,8 +12,9 @@ ENV = float(next((a.split('=')[1] for a in sys.argv if a.startswith('--env=')), 
 KEYP = float(next((a.split('=')[1] for a in sys.argv if a.startswith('--key=')), 115))
 
 P = B.load_params()
-B.ZMAP_A = P.get('zmap_a', 1.0)
-B.CAM.update(h=P['camera']['h'], d=P['camera']['d'])
+P = B.scale_radial(P, P.get('radial_scale', 1.0))
+B.ZMAP_A = P.get('zmap_a', 1.0); B.ZMAP_B = P.get('zmap_b', 0.0)
+B.CAM.update(h=P['camera']['h'], d=P['camera']['d'], zt=P['camera'].get('zt'))
 B.HANDLE_ADJ.update(dz=P['handle'].get('adj_dz', 0), sx=P['handle'].get('adj_sx', 1))
 rf = P['body_bottom_fillet']
 s, objs, C, z_sh0 = B.setup_scene(P, 'FULL', 0, rf)
@@ -58,11 +59,11 @@ def principled(name, base, metallic=0.0, rough=0.5, coat=0.0, spec=0.5):
     if 'Specular IOR Level' in bs.inputs: bs.inputs['Specular IOR Level'].default_value = spec
     return m
 colors = {k: v for k, v in P['colors'].items() if not k.startswith('_')}
-BODY_MAT = principled('BODY_MAT_MASTER', hex2lin(colors['BLUE']), 0.0, 0.42, 0.0)
+BODY_MAT = principled('BODY_MAT_MASTER', hex2lin(colors['BLUE']), 0.0, 0.5, 0.0)
 BODY_MAT['note'] = 'Base Color = variable. Metallic : peinture poudre supposée non métallique (matériau réel TO_DEFINE_FACTORY). Roughness calée visuellement (satiné).'
 RING_MAT = principled('METAL_RING_MAT', (0.91, 0.91, 0.90), 1.0, 0.1)
 CAP_MAT = principled('CAP_BLACK_MASTER', (0.012, 0.012, 0.012), 0.0, 0.38)
-HINGE_MAT = principled('HINGE_MAT', (0.02, 0.02, 0.02), 0.0, 0.3)
+HINGE_MAT = principled('HINGE_MAT', (0.85, 0.85, 0.84), 1.0, 0.18) if P.get('hinge_material') == 'metal' else principled('HINGE_MAT', (0.02, 0.02, 0.02), 0.0, 0.3)
 assign = {'BODY': BODY_MAT, 'NECK': BODY_MAT, 'METAL_RING': RING_MAT, 'CAP': CAP_MAT, 'HANDLE': CAP_MAT, 'HINGE_L': HINGE_MAT, 'HINGE_R': HINGE_MAT}
 for n, ob in objs.items():
     ob.data.materials.clear(); ob.data.materials.append(assign[n])
@@ -169,6 +170,13 @@ def shoot(camname, fname, res=(1200, 1600), frame=1):
 ONLY = next((a.split('=')[1] for a in sys.argv if a.startswith('--only=')), None)
 if ONLY == 'handle_down':
     shoot('CAM_3Q_RIGHT', 'handle_down.png', frame=24)
+if ONLY == 'lineup':
+    lineup.hide_render = False
+    for ob in objs.values(): ob.hide_render = True
+    lc = cam('CAM_LINEUP', (0, -9.5, 0.85), (0, 0, 0.68), 60); s.camera = lc; rset((1800, 1000)); s.render.filepath = os.path.join(REN, 'color_variants.png'); bpy.ops.render.render(write_still=True)
+    lineup.hide_render = True
+    for ob in objs.values(): ob.hide_render = False
+    bpy.data.objects.remove(lc)
 if '--test' in sys.argv:
     shoot('CAM_REFERENCE', 'test_ref.png', res=(450, 600)); shoot('CAM_DETAIL_CAP', 'test_cap.png', res=(450, 600)); sys.exit(0)
 if '--render' in sys.argv:

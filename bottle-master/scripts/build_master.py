@@ -15,12 +15,26 @@ ZMAP_A = None
 CAM = {'h': 1.0, 'd': 12.0}
 HANDLE_ADJ = {'dz': 0.0, 'sx': 1.0}
 SHOULDER_FIT = {}
+ZMAP_B = 0.0
 def zm(z):
-    """hauteur mesurée dans l'image -> hauteur 3D (point fixe : bas de la bague z = 1)"""
-    return ZMAP_A * z + (1 - ZMAP_A)
+    """hauteur mesurée dans l'image -> hauteur 3D : échelle (point fixe z = 1) + décalage constant
+    (en plongée, les repères pris sur l'avant d'une pièce paraissent plus bas que ses flancs)"""
+    return ZMAP_A * z + (1 - ZMAP_A) + ZMAP_B
 
+PARAMS = os.environ.get('BOTTLE_PARAMS', os.path.join(ROOT, 'data', 'params.json'))
 def load_params():
-    P = json.load(open(os.path.join(ROOT, 'data', 'params.json')))
+    P = json.load(open(PARAMS))
+    return P
+
+def scale_radial(P, rs):
+    """Échelle radiale commune (corrige le raccourcissement vertical d'une photo prise en plongée)."""
+    if rs == 1.0: return P
+    P = json.loads(json.dumps(P))
+    P['body_profile']['r'] = [None if v is None else v * rs for v in P['body_profile']['r']]
+    P['body_radius'] *= rs; P['neck_radius'] *= rs
+    if 'r' in P['ring']: P['ring']['r'] *= rs
+    for k in ('r_lower', 'r_upper', 'radius'): P['cap'][k] *= rs
+    P['top_scale_x'] = P.get('top_scale_x', 1.0) * rs
     return P
 
 def smooth(a, w=5):
@@ -31,7 +45,7 @@ def smooth(a, w=5):
 
 def body_profile(P, rf):
     """profil (r, z) du corps + col, du centre du fond jusqu'à z = 1.0"""
-    z = zm(np.array(P['body_profile']['z'])); r = np.array(P['body_profile']['r'])
+    z = np.minimum(zm(np.array(P['body_profile']['z'], float)), 1.0); r = np.array([np.nan if v is None else v for v in P['body_profile']['r']], float)
     R = P['body_radius']; RN = P['neck_radius']
     ok = ~np.isnan(r)
     z, r = z[ok], r[ok]
@@ -243,12 +257,19 @@ def setup_scene(P, stage, phi, rf):
     # caméra à plan d'image vertical (pas de bascule), hauteur cam_h, distance cam_d ; décentrement pour cadrer
     D, hc = CAM['d'], CAM['h']
     cam.data.sensor_fit = 'VERTICAL'; cam.data.sensor_height = 24
-    cam.data.lens = 24 * D / 1.75
     cam.location = (0.0, -D, hc)
-    cam.rotation_euler = (math.pi / 2, 0, 0)
-    cam.data.shift_y = (0.69 - hc) / 1.75
+    if CAM.get('zt') is not None:
+        # caméra visée (inclinée) : le plan image n'est plus vertical, les verticales convergent comme sur la photo
+        import mathutils
+        dv = mathutils.Vector((0.0, 0.0, CAM['zt'])) - cam.location
+        cam.rotation_euler = dv.to_track_quat('-Z', 'Y').to_euler()
+        cam.data.lens = 24 * dv.length / 1.9
+    else:
+        cam.data.lens = 24 * D / 1.75
+        cam.rotation_euler = (math.pi / 2, 0, 0)
+        cam.data.shift_y = (0.69 - hc) / 1.75
     s.camera = cam
-    img_path = os.path.join(ROOT, 'reference', 'ref_panel.png')
+    img_path = os.path.join(ROOT, P.get('ref_image', 'reference/ref_panel.png'))
     if os.path.exists(img_path):
         img = bpy.data.images.load(img_path); img.pack(); img.name = 'REF_IMAGE'
         cam.data.show_background_images = True
@@ -273,12 +294,15 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('stage'); ap.add_argument('--phi', type=float, default=4.5); ap.add_argument('--rf', type=float, default=None)
     ap.add_argument('--out', default='/tmp/sil'); ap.add_argument('--tag', default='')
-    ap.add_argument('--za', type=float, default=None); ap.add_argument('--ch', type=float, default=None); ap.add_argument('--cd', type=float, default=None); ap.add_argument('--hdz', type=float, default=None); ap.add_argument('--hsx', type=float, default=None)
+    ap.add_argument('--za', type=float, default=None); ap.add_argument('--ch', type=float, default=None); ap.add_argument('--cd', type=float, default=None); ap.add_argument('--czt', type=float, default=None); ap.add_argument('--rs', type=float, default=None); ap.add_argument('--zb', type=float, default=None); ap.add_argument('--hdz', type=float, default=None); ap.add_argument('--hsx', type=float, default=None)
     a = ap.parse_args()
     P = load_params()
+    P = scale_radial(P, a.rs if a.rs is not None else P.get('radial_scale', 1.0))
     ZMAP_A = a.za if a.za is not None else P.get('zmap_a', 1.0)
+    ZMAP_B = a.zb if a.zb is not None else P.get('zmap_b', 0.0)
     CAM['h'] = a.ch if a.ch is not None else P.get('camera', {}).get('h', 1.0)
     CAM['d'] = a.cd if a.cd is not None else P.get('camera', {}).get('d', 12.0)
+    CAM['zt'] = a.czt if a.czt is not None else P.get('camera', {}).get('zt')
     if a.rf is None: a.rf = P.get('body_bottom_fillet', 0.035)
     HANDLE_ADJ['dz'] = a.hdz if a.hdz is not None else P['handle'].get('adj_dz', 0.0)
     HANDLE_ADJ['sx'] = a.hsx if a.hsx is not None else P['handle'].get('adj_sx', 1.0)

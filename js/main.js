@@ -3,8 +3,17 @@ import { ArtworkEngine } from './artwork.js';
 import { allowedFinishes, allowedMethods, allowedZones, computePrice, sanitize } from './pricing.js';
 
 const PRODUCT_URL = 'products/cricket-bottle/product.json';
-// Point d'envoi des projets vers SKLUBS : TO_DEFINE (API, WooCommerce, CRM...).
+// Point d'envoi direct (API) : optionnel. Sur le site, l'envoi passe par la page parente (voir integration/wordpress).
 const SUBMIT_ENDPOINT = null;
+// Pages autorisées à intégrer le configurateur et à recevoir les projets (postMessage)
+const PARENT_ORIGINS = ['https://sklubs.fr', 'https://www.sklubs.fr', 'https://sklubs.com', 'https://www.sklubs.com'];
+const parentOrigin = (() => {
+  if (window.parent === window) return null;
+  try {
+    const o = document.referrer ? new URL(document.referrer).origin : null;
+    return PARENT_ORIGINS.includes(o) ? o : null;
+  } catch { return null; }
+})();
 
 const $ = (s, r = document) => r.querySelector(s);
 const el = (tag, attrs = {}, html = '') => {
@@ -658,7 +667,20 @@ function exportProject() {
   return proj;
 }
 
+function sendToParent() {
+  const proj = buildProject();
+  window.parent.postMessage({ type: 'sklubs:bottle:project', version: 1, project: proj }, parentOrigin);
+  toast('Projet transmis à SKLUBS…');
+}
+
+window.addEventListener('message', (e) => {
+  if (!parentOrigin || e.origin !== parentOrigin) return;
+  if (e.data?.type === 'sklubs:bottle:project-received') toast(`Projet reçu par SKLUBS${e.data.reference ? ` (réf. ${e.data.reference})` : ''}. Nous revenons vers vous avec le chiffrage.`);
+  if (e.data?.type === 'sklubs:bottle:project-error') toast(e.data.message || 'Envoi impossible. Réessayez ou contactez SKLUBS.');
+});
+
 async function sendProject() {
+  if (parentOrigin) { sendToParent(); return; }
   if (!SUBMIT_ENDPOINT) {
     exportProject();
     if (!window.SKLUBS_PREVIEW) toast('Envoi en ligne à brancher (point d\'envoi SKLUBS à définir). Projet et aperçu téléchargés.');

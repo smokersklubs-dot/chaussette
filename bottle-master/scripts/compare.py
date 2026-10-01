@@ -4,8 +4,8 @@ import numpy as np, json, os, sys, argparse
 from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
-REF = np.asarray(Image.open(os.path.join(ROOT, 'reference', 'ref_panel.png')).convert('RGB')).astype(float)
-EDGES = json.load(open(os.path.join(ROOT, 'data', 'ref_edges_blue.json')))
+EDGES = json.load(open(os.environ.get('BOTTLE_EDGES', os.path.join(ROOT, 'data', 'ref_edges_blue.json'))))
+REF = np.asarray(Image.open(os.path.join(ROOT, EDGES.get('image', 'reference/ref_panel.png'))).convert('RGB')).astype(float)
 
 def ref_rows():
     return {int(y): v for y, v in EDGES['rows'].items()}
@@ -37,20 +37,22 @@ def analyse(path, stage, outdir, tag=''):
     # hauteur provisoire pour convertir l'offset de 18 px
     top_red = np.where(red[:, int(cxr)])[0][0]
     k0 = EDGES['H'] / (bot_r - top_red)
-    xoff = int(round(cxr - 18 / k0))
+    xoff = int(round(cxr - EDGES.get('ring_probe_dx', 18) / k0))
     ring_bot_r = np.where(red[:, xoff])[0][0] - 0.0 if stage != 'A' else top_red
     if stage == 'A':  # sans bague : le haut du col (z = 1) fait office de repère
         colr = a[:, xoff]; yt = np.where(colr > 0.5)[0][0]
         ring_bot_r = yt - (colr[yt] - 0.5) / max(colr[yt] - colr[yt - 1], 1e-6) + 0.5
     # repère bas robuste : ligne où la largeur tombe à 50 % du corps (sub-pixel), réf et rendu
     rows0 = ref_rows()
-    wref = {y: v['R'] - v['L'] for y, v in rows0.items() if y > 300}
-    wb = np.median([w for y, w in wref.items() if y < 330]); half = wb / 2
+    Hq = EDGES['H']; bq = EDGES['bottom']
+    wref = {y: v['R'] - v['L'] for y, v in rows0.items() if y > bq - 0.2 * Hq}
+    wb = np.median([w for y, w in wref.items() if y < bq - 0.07 * Hq]); half = wb / 2
     ys_ = sorted(wref)
-    bot = next(y + (wref[y] - half) / (wref[y] - wref[y + 1]) + 0.5 for y in ys_[:-1] if wref[y] >= half > wref[y + 1])
+    bot = next(y + (wref[y] - half) / (wref[y] - wref[y + 1]) + 0.5 for y in ys_[:-1] if (y + 1) in wref and wref[y] >= half > wref[y + 1])
     wr = (a > 0.5).sum(1).astype(float)
-    wbr = np.median(wr[int(bot_r) - 60:int(bot_r) - 20]); hr = wbr / 2
-    yy = int(bot_r) - 20
+    hb = bot_r - np.where(a.max(1) > 0.5)[0][0]; hbody = hb / 1.4
+    wbr = np.median(wr[int(bot_r - 0.2 * hbody):int(bot_r - 0.07 * hbody)]); hr = wbr / 2
+    yy = int(bot_r - 0.07 * hbody)
     while not (wr[yy] >= hr > wr[yy + 1]): yy += 1
     bot_r = yy + (wr[yy] - hr) / (wr[yy] - wr[yy + 1]) + 0.5
     k = (bot - EDGES['ring_bot']) / (bot_r - ring_bot_r)
@@ -62,7 +64,7 @@ def analyse(path, stage, outdir, tag=''):
     active = {'A': ('neck', 'shoulder', 'body', 'bottom'), 'B': ('ring', 'cap_skirt', 'neck', 'shoulder', 'body', 'bottom')}.get(stage, tuple(zones))
     err = {z: [] for z in zones}; per_row = []
     for y, v in sorted(rows.items()):
-        zname = next(z for z, (y0, y1) in zones.items() if y0 <= y <= y1)
+        zname = next((z for z, (y0, y1) in zones.items() if y0 <= y <= y1), None)
         if zname not in active: continue
         yr = to_r_y(y + 0.5)  # centre de la ligne de référence
         yi = int(np.floor(yr))
@@ -84,7 +86,7 @@ def analyse(path, stage, outdir, tag=''):
     missing = {z: sum(1 for r in per_row if r[1] == z and r[2] and r[2].get('missing')) for z in zones}
     summary = {z: dict(missing=missing[z], mean=round(float(np.mean(v)), 2), p90=round(float(np.percentile(v, 90)), 2), max=round(float(np.max(v)), 2), n=len(v) // 2) for z, v in err.items() if v}
     # ---- overlay 50/50 + contours, zone de la bouteille bleue, x4
-    x0, x1, y0, y1 = 165, 272, 20, 350; S = 4
+    x0, x1, y0, y1 = EDGES.get('overlay_box', [165, 272, 20, 350]); S = EDGES.get('overlay_scale', 4)
     crop = Image.fromarray(REF[y0:y1, x0:x1].astype(np.uint8)).resize(((x1 - x0) * S, (y1 - y0) * S), Image.LANCZOS)
     # rééchantillonnage du rendu dans le repère référence
     ys, xs = np.mgrid[y0 * S:y1 * S, x0 * S:x1 * S] / S
@@ -100,7 +102,7 @@ def analyse(path, stage, outdir, tag=''):
     edge = (np.abs(np.diff(ra > 0.5, axis=1, prepend=0)) > 0) | (np.abs(np.diff(ra > 0.5, axis=0, prepend=0)) > 0)
     cont_np = np.asarray(cont).copy()
     for y, v in rows.items():
-        zname = next(z for z, (a0, a1) in zones.items() if a0 <= y <= a1)
+        zname = next((z for z, (a0, a1) in zones.items() if a0 <= y <= a1), None)
         if zname not in active: continue
         for key in ('L', 'R', 'iL', 'iR'):
             if key in v:

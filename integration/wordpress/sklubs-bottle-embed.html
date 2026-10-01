@@ -1,0 +1,31 @@
+<!--
+  SKLUBS — intégration du configurateur bouteille dans une page WordPress.
+  À coller dans un bloc « HTML personnalisé » de la page (ex. /configurateur-bouteille-personnalisee/).
+  1. Remplacer CONFIGURATOR_URL par l'adresse où le dépôt est publié (ex. https://bouteille.sklubs.fr/).
+  2. Installer l'extension sklubs-bottle-projects.php (voir README.md) : elle fournit le point d'envoi et le jeton.
+-->
+<div class="sklubs-bottle-frame" style="position:relative;width:100%;height:min(90vh,880px);min-height:620px;border-radius:14px;overflow:hidden;background:#F6F6F4">
+  <iframe id="sklubs-bottle" src="CONFIGURATOR_URL" title="Configurateur bouteille SKLUBS"
+          style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="fullscreen" loading="lazy"></iframe>
+</div>
+<script>
+(function () {
+  var frame = document.getElementById('sklubs-bottle');
+  var configuratorOrigin = new URL(frame.src, window.location.href).origin;
+  var cfg = window.SKLUBS_BOTTLE || {};   // injecté par l'extension : { endpoint, nonce }
+  window.addEventListener('message', function (e) {
+    if (e.origin !== configuratorOrigin || !e.data || e.data.type !== 'sklubs:bottle:project') return;
+    if (!cfg.endpoint) {
+      frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-error', message: 'Réception des projets non configurée sur le site.' }, configuratorOrigin);
+      return;
+    }
+    fetch(cfg.endpoint, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce },
+      body: JSON.stringify(e.data.project)
+    }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || r.status); return j; }); })
+      .then(function (j) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-received', reference: j.reference }, configuratorOrigin); })
+      .catch(function (err) { frame.contentWindow.postMessage({ type: 'sklubs:bottle:project-error', message: 'Envoi impossible (' + err.message + '). Réessayez ou contactez SKLUBS.' }, configuratorOrigin); });
+  });
+})();
+</script>

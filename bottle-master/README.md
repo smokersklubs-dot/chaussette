@@ -1,9 +1,13 @@
 # SKLUBS_BOTTLE_MASTER — reconstruction 3D contrainte
 
-Master 3D de la bouteille isotherme, reconstruit **depuis la référence uniquement**, dans Blender (5.0, en script).
+Master 3D de la bouteille isotherme, reconstruit **depuis la photo originale uniquement**, dans Blender (5.0, en script).
+
+**Version actuelle : v2**, calée sur `reference/original/photo_originale.jpg`. La v1, construite sur l'encart d'une planche
+générée (produit plus trapu), est archivée : `*_V1_ENCART.md`, `renders/v1_encart_checkpoints/`, `data/params.json`.
 Unité : **BODY_HEIGHT = 1.000** (fond → bas de la bague). Aucune cote usine : `TO_DEFINE_FACTORY`.
 
-- Référence : `reference/ref_panel.png`, encart des six bouteilles de `reference/source_board.webp`.
+- Référence : `reference/original/photo_originale.jpg`, bouteille bleue du premier rang redressée (`rect_blue.png`).
+- Paramètres v2 : `data/photo/params.json`, contour de référence : `data/photo/ref_edges_blue.json`.
 - Ratios mesurés : [`REFERENCE_RATIO_TABLE.md`](REFERENCE_RATIO_TABLE.md).
 - Erreurs mesurées par calque : [`PIXEL_CLOSE_ERROR_REPORT.md`](PIXEL_CLOSE_ERROR_REPORT.md).
 
@@ -17,7 +21,7 @@ Unité : **BODY_HEIGHT = 1.000** (fond → bas de la bague). Aucune cote usine :
 | `export/SKLUBS_BOTTLE_UV.png` | gabarit du déroulé du corps : zones face / dos / 360°, axe, couture |
 | `export/color_variants.json` | six teintes de validation (échantillonnées, indicatives) |
 | `renders/` | vues front / back / left / right / top / 3q, macros bouchon et anse, anse rabattue, six couleurs, caméra de référence, calque 50/50 |
-| `renders/checkpoints/` | calques A (corps), B (+ bague + bouchon), C (+ anse + pivots) : overlay 50/50, contours, erreurs par ligne |
+| `renders/photo_checkpoints/` | calques A (corps), B (+ bague + bouchon), C (+ anse + rivets) sur la photo : overlay 50/50, contours, erreurs par ligne |
 
 ## Structure Blender
 
@@ -41,6 +45,8 @@ SKLUBS_BOTTLE_MASTER
 ```bash
 pip install bpy==5.0.1          # Blender en module Python (rendu Cycles CPU)
 cd scripts
+export BOTTLE_PARAMS=$PWD/../data/photo/params.json BOTTLE_EDGES=$PWD/../data/photo/ref_edges_blue.json
+python3 photo/hsl.py && python3 photo/rectify.py && python3 photo/measure_photo.py && python3 photo/params_photo.py  # mesures (écrase les calages : à refaire ensuite)
 python3 build_master.py C --out /tmp/sil      # silhouette de contrôle (étapes A, B ou C)
 python3 compare.py /tmp/sil/sil_C.png C --out /tmp/sil   # calque + erreurs par zone
 python3 make_master.py --render               # .blend, GLB, rendus (≈ 20 min CPU)
@@ -53,10 +59,10 @@ Les paramètres sont tous dans `data/params.json`. Les mesures brutes et leurs s
 | Étape | État |
 |---|---|
 | 01–02 Référence et ratios | fait, 3 bouteilles croisées |
-| 03 REF_CAMERA | fait, caméra perspective calée par silhouette |
-| 04–06 BODY + checkpoint A | validé : corps 0,26 px, épaulement 0,56 px, fond 0,81 px |
-| 07–09 Bague + bouchon + checkpoint B | validé : bague 0,31 px, haut du bouchon −0,23 px |
-| 10–12 Anse + pivots + checkpoint C | validé : largeur de l'anse 0,85 px, sommet −0,12 px |
+| 03 REF_CAMERA | fait, caméra plongeante calée par silhouette (hauteur 1,2, distance 5, visée 0,7) |
+| 04–06 BODY + checkpoint A | fait ; validé au checkpoint B (repère cohérent) |
+| 07–09 Bague + bouchon + checkpoint B | validé : corps 0,64 px, bague 0,60 px, épaulement 0,92 px, haut du bouchon −0,6 px |
+| 10–12 Anse + rivets + checkpoint C | validé : largeur de l'anse 1,1 px, sommet 0,1 px |
 | 13 Topologie | quads, pôles fusionnés, normales sortantes, arêtes vives au-delà de 40° |
 | 14–15 Matériaux + 6 couleurs | fait, instances liées d'un seul mesh |
 | 16–17 UV + zones d'impression | fait |

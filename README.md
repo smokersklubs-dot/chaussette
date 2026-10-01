@@ -10,6 +10,16 @@ Le modèle 3D affiché est le **master reconstruit et validé par calque** sur l
 (`bottle-master/`, voir son README). Le configurateur charge `bottle-master/export/SKLUBS_BOTTLE_WEB.glb`
 (compression Draco, décodeur chargé depuis le CDN de Three.js).
 
+## Mettre en ligne (Vercel)
+
+1. Sur vercel.com : **Add New → Project**, importer le dépôt GitHub `smokersklubs-dot/chaussette`.
+2. Framework : **Other**. Pas de commande de build, dossier de sortie : racine. Déployer.
+3. Domaine : ajouter par exemple `bouteille.sklubs.fr` dans **Settings → Domains**.
+
+`vercel.json` autorise l'affichage du configurateur dans les pages de sklubs.fr et sklubs.com, et sert le modèle 3D
+avec le bon type. `.vercelignore` ne publie que le site et le modèle web (pas les fichiers de travail Blender).
+Ensuite, brancher le site WordPress : voir `integration/wordpress/README.md`.
+
 ## Lancer en local
 
 ```bash
