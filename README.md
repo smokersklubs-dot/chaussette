@@ -48,18 +48,26 @@ Un serveur HTTP est nécessaire (le produit est chargé depuis un fichier JSON).
 `thumbnail.webp` et son master 3D, puis l'ajouter dans `products/catalog.json`. Une catégorie sans modèle
 s'affiche « Bientôt ».
 
-## Parcours
+## Parcours (planche SKLUBS, écrans 04 à 12)
 
-1. **Capacité** : un seul format, celui du master. Capacité et cotes : à confirmer usine.
-2. **Matière** : inox double paroi, finitions mat, brillant, soft touch et brossé naturel.
-   Chaque finition modifie le shader (rugosité, métal, vernis, grain).
-3. **Couleurs** : corps, bouchon et anse indépendants (nuancier, HEX, RGB, référence Pantone),
-   bague en inox poli ou métal noir. L'anse se rabat (bouton dans le viewer).
-4. **Marquage** : technique filtrée par matière, zone (face, dos, wrap 360°),
-   import PNG / JPG / SVG, déplacement direct sur la bouteille ou sur le patron 2D,
-   taille, rotation, zones de sécurité. La gravure laser révèle le métal avec relief.
-5. **Quantité** : saisie libre et tableau des paliers (prix unitaire, économie, « le plus choisi »), MOQ, délai.
-6. **Récapitulatif** : vue produit centrée, envoi du projet, export PNG + JSON.
+Barre d'outils 3D : rotation 360°, zoom, vue arrière, vue de dessus, détails, vue éclatée,
+anse rabattue, zone d'impression, recentrer, plein écran.
+
+1. **Matière & couleur** : matière du corps (matières sans master 3D affichées « Sur demande »),
+   couleur du corps (nuancier, couleur personnalisée HEX, référence Pantone), finition.
+2. **Bouchon & détails** : type de bouchon, couleurs du bouchon et de l'anse, anneau métallique,
+   vue éclatée automatique.
+3. **Personnalisation** : plusieurs éléments (logos importés et textes : police, gras, italique, couleur),
+   position, taille, rotation, glisser directement sur la bouteille ; zones face, dos, wrap 360°.
+4. **Aperçu d'impression** : vues avant, arrière, droite, gauche, 360° ; gabarit 2D déroulé avec zone
+   imprimable, zone de sécurité et ligne de centrage (cotes en mm dès que l'échelle usine est connue).
+5. **Méthode d'impression** : techniques compatibles avec la matière, description et avantages ;
+   la zone s'ajuste si la technique ne la permet pas.
+6. **Quantité & prix** : paliers (« le plus populaire »), récapitulatif prix (unitaire, total, économie,
+   délai, mention HT/TTC). Sans prix renseigné : « Sur devis ».
+7. **Vue finale** : bouteille sur socle, récapitulatif complet ; « Ajouter au projet » (enregistré sur l'appareil
+   et transmis au site), « Demander un devis », « Commander » (actif seulement avec un prix confirmé),
+   « Télécharger le rendu 3D ».
 
 Mobile : viewer en haut, panneau en bottom sheet (replié, moyen, plein écran).
 
@@ -104,6 +112,7 @@ Dès que les champs `pricing` sont remplis, le prix s'affiche instantanément
 
 ## Fichier projet exporté
 
-`product_id`, `variant_id`, `size`, `materials`, `colors`, `color_refs`, `artwork`,
+`intent` (quote / order / save), `product_id`, `variant_id`, `size`, `materials`, `colors`, `color_refs`,
+`artwork` (visuel déroulé 360° complet, PNG), `artwork_layers` (chaque logo ou texte avec sa position),
 `artwork_transform` (unités BODY_HEIGHT, % de zone, mm si l'échelle est connue), `model`, `printing_method`, `print_zones`, `quantity`, `pricing`,
 `camera_preview`, `preview_image` (PNG), `timestamp`.

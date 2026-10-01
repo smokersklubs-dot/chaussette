@@ -169,31 +169,62 @@
       "id": "laser",
       "label": "Gravure laser",
       "render": "engrave",
-      "maxColors": 1
+      "maxColors": 1,
+      "desc": "Le marquage est gravé : la peinture est retirée et révèle l'inox. Rendu élégant et durable, idéal pour un look premium.",
+      "benefits": [
+        "Résistant aux rayures",
+        "Effet métallique naturel",
+        "Parfait pour les logos",
+        "Monochrome (couleur du métal)"
+      ]
     },
     {
       "id": "uv",
       "label": "Impression UV",
       "render": "print",
-      "maxColors": null
+      "maxColors": null,
+      "desc": "Impression couleur directe sur la bouteille : détails fins, dégradés et photos.",
+      "benefits": [
+        "Couleurs illimitées",
+        "Dégradés et photos",
+        "Détails fins"
+      ]
     },
     {
       "id": "screen",
       "label": "Sérigraphie",
       "render": "print",
-      "maxColors": "TO_DEFINE"
+      "maxColors": "TO_DEFINE",
+      "desc": "Encre déposée en aplats à travers un écran : couleurs vives et opaques, pour des logos simples.",
+      "benefits": [
+        "Couleurs vives et opaques",
+        "Adaptée aux logos en aplats",
+        "Nombre de couleurs : à confirmer usine"
+      ]
     },
     {
       "id": "pad",
       "label": "Tampographie",
       "render": "print",
-      "maxColors": "TO_DEFINE"
+      "maxColors": "TO_DEFINE",
+      "desc": "Tampon souple qui épouse les courbes : marquage précis sur une petite zone.",
+      "benefits": [
+        "Petites zones",
+        "Bonne précision sur surface courbe",
+        "Nombre de couleurs : à confirmer usine"
+      ]
     },
     {
       "id": "wrap360",
       "label": "Impression 360°",
       "render": "print",
-      "maxColors": null
+      "maxColors": null,
+      "desc": "Impression sur tout le tour de la bouteille, sans interruption.",
+      "benefits": [
+        "Visuel continu sur 360°",
+        "Couleurs illimitées",
+        "Idéal pour motifs et all-over"
+      ]
     }
   ],
   "rules": {
@@ -280,7 +311,8 @@
     },
     "tiers": {
       "master": []
-    }
+    },
+    "taxLabel": "HT"
   },
   "master": {
     "model": "bottle-master/export/SKLUBS_BOTTLE_WEB.glb",
@@ -346,5 +378,24 @@
   },
   "production": {
     "leadTime": null
-  }
+  },
+  "materialsOnRequest": [
+    {
+      "label": "Aluminium",
+      "desc": "Léger et économique"
+    },
+    {
+      "label": "Tritan",
+      "desc": "Sans BPA"
+    },
+    {
+      "label": "Verre",
+      "desc": "Élégant et durable"
+    },
+    {
+      "label": "Personnalisé",
+      "desc": "Matière sur demande"
+    }
+  ],
+  "materialsOnRequestNote": "Pas encore de master 3D ni de donnée usine pour ces matières : précisez-les dans votre demande de devis."
 }

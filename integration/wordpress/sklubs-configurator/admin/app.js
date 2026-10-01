@@ -83,7 +83,7 @@
       const t = h('table', { class: 'sk-table' },
         h('thead', {}, h('tr', {}, cols.map((c) => h('th', { style: c.width ? `width:${c.width}` : null, title: c.hint || null }, c.label)), h('th', { style: 'width:36px' }))),
         h('tbody', {}, rows.map((row, i) => h('tr', {}, cols.map((c) => h('td', {}, cell(row, i, c))),
-          h('td', {}, h('button', { type: 'button', class: 'sk-x', title: 'Supprimer la ligne', onclick: () => { opts.onRemove ? opts.onRemove(row, i) : rows.splice(i, 1); markDirty(); draw(); opts.after?.(); } }, '×'))))));
+          opts.remove === false ? null : h('td', {}, h('button', { type: 'button', class: 'sk-x', title: 'Supprimer la ligne', onclick: () => { opts.onRemove ? opts.onRemove(row, i) : rows.splice(i, 1); markDirty(); draw(); opts.after?.(); } }, '×'))))));
       wrap.append(t);
       if (opts.add !== false) wrap.append(h('button', { type: 'button', class: 'button sk-add', onclick: () => { const r = opts.newRow ? opts.newRow() : {}; if (opts.onAdd) opts.onAdd(r); else rows.push(r); markDirty(); draw(); opts.after?.(); } }, opts.addLabel || '+ Ajouter'));
     };
@@ -274,11 +274,20 @@
       table(p.materials, [
         { label: 'Identifiant', key: 'id', slug: true, width: '120px' },
         { label: 'Nom', key: 'label', width: '180px' },
+        { label: 'Description client', key: 'desc', placeholder: 'vide = techniques possibles', width: '180px' },
         { label: 'Finitions possibles', key: 'finishes', type: 'multi', options: finOpts },
         { label: 'Finition par défaut', key: 'defaultFinish', type: 'select', options: finOpts, width: '150px' },
         { label: 'Supplément € / u', type: 'number', width: '100px', get: (r) => pr.materialSurcharge[r.id], set: (r, v) => { pr.materialSurcharge[r.id] = v; } },
         { label: 'Confirmée', key: 'confirmed', type: 'check', width: '70px' },
       ], { newRow: () => ({ id: 'matiere', label: 'Nouvelle matière', finishes: Object.keys(p.finishes).slice(0, 1), defaultFinish: Object.keys(p.finishes)[0], confirmed: false }) }));
+    p.materialsOnRequest = p.materialsOnRequest || [];
+    body.append(h('h3', {}, 'Matières sur demande (affichées, non configurables en 3D)'),
+      h('p', { class: 'sk-help' }, 'Listées dans l\'étape « Matière & couleur » avec la mention « Sur demande » : le client les précise dans sa demande de devis.'),
+      table(p.materialsOnRequest, [
+        { label: 'Nom', key: 'label', width: '200px' },
+        { label: 'Description', key: 'desc' },
+      ], { newRow: () => ({ label: 'Nouvelle matière', desc: '' }), addLabel: '+ Ajouter une matière sur demande' }),
+      field('Message au clic', text('materialsOnRequestNote', { placeholder: 'ex. Précisez-la dans votre demande de devis.' })));
     // finitions : objet -> lignes
     const rows = Object.entries(p.finishes).map(([id, f]) => ({ id, ...f }));
     const sync = () => { const o = {}; rows.forEach((r) => { const { id, ...rest } = r; if (id) o[id] = rest; }); p.finishes = o; };
@@ -339,6 +348,13 @@
         { label: 'Matières', type: 'multi', options: matOpts, get: (r) => matsOf(r.id), set: (r, v) => setMats(r.id, v) },
         { label: 'Zones', type: 'multi', options: zoneOpts, get: (r) => p.rules.zonesByMethod[r.id] || [], set: (r, v) => { p.rules.zonesByMethod[r.id] = v; } },
       ], { newRow: () => ({ id: 'technique', label: 'Nouvelle technique', render: 'print', maxColors: null }) }),
+      h('h3', {}, 'Textes des techniques (étape « Méthode d\'impression »)'),
+      table(p.printingMethods, [
+        { label: 'Technique', key: 'label', width: '150px' },
+        { label: 'Description', key: 'desc' },
+        { label: 'Avantages (séparés par ;)', get: (r) => (r.benefits || []).join(' ; '), set: (r, v) => { r.benefits = v.split(';').map((x) => x.trim()).filter(Boolean); } },
+        { label: 'Couleurs max', type: 'number', step: 1, width: '90px', placeholder: 'vide = illimité', get: (r) => (typeof r.maxColors === 'number' ? r.maxColors : null), set: (r, v) => { r.maxColors = v; } },
+      ], { add: false, remove: false }),
       h('h3', {}, 'Zones d\'impression'),
       table(p.printZones, [
         { label: 'Identifiant', key: 'id', slug: true, width: '120px' },
@@ -358,7 +374,8 @@
       field('Affichage du prix', select('pricing.priceMode', [{ value: 'instant', label: 'Prix instantané' }, { value: 'estimated', label: 'Prix estimé (confirmé ensuite)' }])),
       field('Minimum de commande (MOQ)', number('quantity.moq', { step: 1, placeholder: 'vide = premier palier', after: drawSim })),
       field('Quantité proposée par défaut', number('quantity.default', { step: 1, placeholder: '100' })),
-      field('Délai de production', text('production.leadTime', { placeholder: 'ex. 15 jours ouvrés' }))),
+      field('Délai de production', text('production.leadTime', { placeholder: 'ex. 15 jours ouvrés' })),
+      field('Mention des prix', select('pricing.taxLabel', [{ value: '', label: 'Aucune' }, { value: 'HT', label: 'HT' }, { value: 'TTC', label: 'TTC' }]))),
       h('p', { class: 'sk-help' }, 'Prix unitaire de base par palier, pour chaque variante. Les suppléments (matière, finition, bague, marquage) s\'ajoutent par unité ; les frais de calage sont répartis sur la quantité. Prix vide = sur devis.'));
     (p.sizes || []).forEach((s) => {
       pr.tiers[s.id] = pr.tiers[s.id] || [];

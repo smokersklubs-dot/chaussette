@@ -17,7 +17,7 @@ export class BottleViewer {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 0.9; // teintes saturées (ex. orange SKLUBS) sans délavage
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
@@ -25,7 +25,7 @@ export class BottleViewer {
     this.scene = new THREE.Scene();
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.85;
+    this.scene.environmentIntensity = 0.72;
 
     this.camera = new THREE.PerspectiveCamera(28, 1, 1, 400);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -93,6 +93,7 @@ export class BottleViewer {
     shadow.rotation.x = -Math.PI / 2;
     shadow.receiveShadow = true;
     this.scene.add(shadow);
+    this.shadowPlane = shadow;
     // ombre de contact douce
     const c = document.createElement('canvas');
     c.width = c.height = 256;
@@ -134,6 +135,15 @@ export class BottleViewer {
     this.handleNode = model.getObjectByName(M.handleNode);
     this.handleFold = THREE.MathUtils.degToRad(M.handleFoldDeg);
     this.handleTarget = this.handleTarget || 0;
+    // pièces mobiles de la vue éclatée (positions d'origine mémorisées)
+    this.explodeParts = [];
+    for (const [part, lift] of [['cap', 0.17], ['handle', 0.17], ['ring', 0.075]]) {
+      for (const n of M.parts[part] || []) {
+        const o = model.getObjectByName(n);
+        if (o) this.explodeParts.push({ o, y0: o.position.y, lift });
+      }
+    }
+    this.explode = this.explode || 0;
     this.group.add(model);
     this.body = model.getObjectByName('BODY');
 
@@ -165,6 +175,32 @@ export class BottleViewer {
   }
 
   setHandleDown(down) { this.handleTarget = down ? 1 : 0; }
+
+  // Vue éclatée : bouchon, anse et bague s'écartent du corps
+  setExploded(on) { this.explodeTarget = on ? 1 : 0; }
+
+  // Socle de présentation (vue finale)
+  setPodium(on) {
+    if (!this.podium) {
+      const R = this.dim.radius, h = this.dim.height * 0.1;
+      const geo = new THREE.CylinderGeometry(R * 2.7, R * 2.85, h, 96);
+      geo.translate(0, -h / 2, 0);
+      this.podium = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: '#FBFBFA', roughness: 0.55, clearcoat: 0.2 }));
+      this.podium.receiveShadow = true;
+      this.podium.scale.y = 0.001;
+      this.scene.add(this.podium);
+    }
+    this.podiumTarget = on ? 1 : 0;
+  }
+
+  // Zoom avant / arrière (bornes des contrôles)
+  zoom(factor) {
+    const t = this.controls.target;
+    const dir = this.camera.position.clone().sub(t);
+    const d = THREE.MathUtils.clamp(dir.length() * factor, this.controls.minDistance, this.controls.maxDistance);
+    const pos = t.clone().add(dir.setLength(d));
+    this.camAnim = { from: { pos: this.camera.position.clone(), target: t.clone() }, to: { pos, target: t.clone() }, start: performance.now(), dur: 450 };
+  }
 
   bindArtwork(artwork) {
     this.artwork = artwork;
@@ -263,10 +299,12 @@ export class BottleViewer {
       front:  { pos: [0, cy + 4, d], target: [0, cy, 0] },
       back:   { pos: [0, cy + 4, -d], target: [0, cy, 0] },
       side:   { pos: [d, cy + 4, 0], target: [0, cy, 0] },
+      left:   { pos: [-d, cy + 4, 0], target: [0, cy, 0] },
       top:    { pos: [0.01, h + d * 0.8, d * 0.35], target: [0, h * 0.55, 0] },
       detail: { pos: [d * 0.22, zc + 2, d * 0.46], target: [0, zc, 0] },
       hero:   { pos: [-d * 0.42, cy + 7, d * 0.9], target: [0, cy, 0] },
       cap:    { pos: [d * 0.2, h * 0.86, d * 0.36], target: [0, h * 0.8, 0] },
+      explode: { pos: [d * 0.3, h * 1.02, d * 0.72], target: [0, h * 0.84, 0] },
     };
   }
 
@@ -372,6 +410,16 @@ export class BottleViewer {
       const cur = this.handleNode.rotation.x / (this.handleFold || -Math.PI / 2);
       const next = cur + (this.handleTarget - cur) * (1 - Math.exp(-dt / 0.12));
       this.handleNode.rotation.x = next * this.handleFold;
+    }
+    if (this.explodeParts?.length) {
+      this.explode += ((this.explodeTarget || 0) - this.explode) * (1 - Math.exp(-dt / 0.14));
+      const e = this.explode * this.explode * (3 - 2 * this.explode);
+      for (const p of this.explodeParts) p.o.position.y = p.y0 + e * p.lift;
+    }
+    if (this.podium) {
+      this.podium.scale.y += (Math.max(0.001, this.podiumTarget) - this.podium.scale.y) * (1 - Math.exp(-dt / 0.16));
+      this.podium.visible = this.podium.scale.y > 0.01;
+      this.shadowPlane.visible = !this.podium.visible;
     }
     if (this.camAnim) {
       const a = this.camAnim;

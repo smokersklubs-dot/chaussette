@@ -1,350 +1,401 @@
 {
- "id": "cricket-bottle",
- "category": "bottles",
- "name": "Bouteille Cricket",
- "subtitle": "Cas test n°1 — devis 2026 Cricket Merchandising",
- "status": "draft",
- "_note": "Toute valeur à null ou marquée TO_DEFINE doit être confirmée par SKLUBS / l'usine. Le configurateur affiche alors « Validation usine requise » au lieu d'un faux prix.",
- "reference": {
-  "source": "2026_CRICKET_MERCHANDISING_QUOTE",
-  "quantity": 200,
-  "visual": "blanc / rouge",
-  "capacity": "TO_DEFINE",
-  "material": "TO_DEFINE",
-  "unitPrice": "TO_DEFINE"
- },
- "sizes": [
-  {
-   "id": "master",
-   "label": "Bouteille isotherme",
-   "capacity": "TO_DEFINE_FACTORY",
-   "confirmed": false,
-   "printZone": {
-    "bottom": 0.065,
-    "top": 0.825
-   }
-  }
- ],
- "defaultSize": "master",
- "components": [
-  {
-   "id": "body",
-   "label": "Corps"
+  "id": "cricket-bottle",
+  "category": "bottles",
+  "name": "Bouteille Cricket",
+  "subtitle": "Cas test n°1 — devis 2026 Cricket Merchandising",
+  "status": "draft",
+  "_note": "Toute valeur à null ou marquée TO_DEFINE doit être confirmée par SKLUBS / l'usine. Le configurateur affiche alors « Validation usine requise » au lieu d'un faux prix.",
+  "reference": {
+    "source": "2026_CRICKET_MERCHANDISING_QUOTE",
+    "quantity": 200,
+    "visual": "blanc / rouge",
+    "capacity": "TO_DEFINE",
+    "material": "TO_DEFINE",
+    "unitPrice": "TO_DEFINE"
   },
-  {
-   "id": "cap",
-   "label": "Bouchon"
-  },
-  {
-   "id": "handle",
-   "label": "Anse"
-  },
-  {
-   "id": "ring",
-   "label": "Bague"
-  }
- ],
- "materials": [
-  {
-   "id": "steel",
-   "label": "Inox double paroi",
-   "confirmed": false,
-   "finishes": [
-    "matte",
-    "gloss",
-    "softtouch",
-    "brushed"
-   ],
-   "defaultFinish": "matte"
-  }
- ],
- "defaultMaterial": "steel",
- "finishes": {
-  "matte": {
-   "label": "Mat (peinture poudre)",
-   "roughness": 0.62,
-   "metalness": 0.0,
-   "clearcoat": 0.0,
-   "colorable": true
-  },
-  "gloss": {
-   "label": "Brillant",
-   "roughness": 0.16,
-   "metalness": 0.0,
-   "clearcoat": 1.0,
-   "clearcoatRoughness": 0.06,
-   "colorable": true
-  },
-  "softtouch": {
-   "label": "Soft touch",
-   "roughness": 0.85,
-   "metalness": 0.0,
-   "clearcoat": 0.0,
-   "sheen": 0.4,
-   "colorable": true
-  },
-  "brushed": {
-   "label": "Inox brossé naturel",
-   "roughness": 0.34,
-   "metalness": 1.0,
-   "clearcoat": 0.0,
-   "brushed": true,
-   "colorable": false,
-   "fixedColor": "#c8c9c7"
-  }
- },
- "colors": {
-  "_note": "Blanc et rouge : visuel Cricket. Les six autres : teintes échantillonnées sur la photo originale du produit. Nuancier usine à confirmer.",
-  "catalog": [
-   {
-    "id": "white",
-    "label": "Blanc",
-    "hex": "#F4F4F1"
-   },
-   {
-    "id": "red",
-    "label": "Rouge",
-    "hex": "#C8102E"
-   },
-   {
-    "id": "black",
-    "label": "Noir",
-    "hex": "#202023"
-   },
-   {
-    "id": "yellow",
-    "label": "Jaune",
-    "hex": "#E0C726"
-   },
-   {
-    "id": "lightblue",
-    "label": "Bleu clair",
-    "hex": "#7BB1D2"
-   },
-   {
-    "id": "orange",
-    "label": "Orange",
-    "hex": "#DB6732"
-   },
-   {
-    "id": "olive",
-    "label": "Vert olive",
-    "hex": "#434638"
-   },
-   {
-    "id": "pink",
-    "label": "Rose",
-    "hex": "#E28195"
-   }
+  "sizes": [
+    {
+      "id": "master",
+      "label": "Bouteille isotherme",
+      "capacity": "TO_DEFINE_FACTORY",
+      "confirmed": false,
+      "printZone": {
+        "bottom": 0.065,
+        "top": 0.825
+      }
+    }
   ],
-  "defaults": {
-   "body": "#F4F4F1",
-   "cap": "#C8102E",
-   "handle": "#C8102E",
-   "ring": "polished"
-  }
- },
- "printZones": [
-  {
-   "id": "front",
-   "label": "Face",
-   "widthRatio": 0.36,
-   "centerU": 0.5
-  },
-  {
-   "id": "back",
-   "label": "Dos",
-   "widthRatio": 0.36,
-   "centerU": 0.0
-  },
-  {
-   "id": "wrap",
-   "label": "Wrap 360°",
-   "widthRatio": 1.0,
-   "centerU": 0.5
-  }
- ],
- "printingMethods": [
-  {
-   "id": "laser",
-   "label": "Gravure laser",
-   "render": "engrave",
-   "maxColors": 1
-  },
-  {
-   "id": "uv",
-   "label": "Impression UV",
-   "render": "print",
-   "maxColors": null
-  },
-  {
-   "id": "screen",
-   "label": "Sérigraphie",
-   "render": "print",
-   "maxColors": "TO_DEFINE"
-  },
-  {
-   "id": "pad",
-   "label": "Tampographie",
-   "render": "print",
-   "maxColors": "TO_DEFINE"
-  },
-  {
-   "id": "wrap360",
-   "label": "Impression 360°",
-   "render": "print",
-   "maxColors": null
-  }
- ],
- "rules": {
-  "_status": "TO_DEFINE — brouillon technique à valider usine",
-  "methodsByMaterial": {
-   "steel": [
-    "laser",
-    "uv",
-    "screen",
-    "pad",
-    "wrap360"
-   ]
-  },
-  "zonesByMethod": {
-   "laser": [
-    "front",
-    "back",
-    "wrap"
-   ],
-   "uv": [
-    "front",
-    "back",
-    "wrap"
-   ],
-   "screen": [
-    "front",
-    "back"
-   ],
-   "pad": [
-    "front",
-    "back"
-   ],
-   "wrap360": [
-    "wrap"
-   ]
-  }
- },
- "quantity": {
-  "moq": "TO_DEFINE",
-  "default": 200,
-  "presets": [
-   100,
-   200,
-   500,
-   1000,
-   2500
-  ]
- },
- "pricing": {
-  "_status": "TO_DEFINE — aucun prix n'est inventé. Remplir ces champs active le calcul instantané.",
-  "currency": "EUR",
-  "basePriceBySize": {
-   "master": null
-  },
-  "materialSurcharge": {
-   "steel": null
-  },
-  "finishSurcharge": {
-   "matte": null,
-   "gloss": null,
-   "softtouch": null,
-   "brushed": null
-  },
-  "methodUnitPrice": {
-   "laser": null,
-   "uv": null,
-   "screen": null,
-   "pad": null,
-   "wrap360": null
-  },
-  "extraZoneUnitPrice": null,
-  "setupFee": {
-   "laser": null,
-   "uv": null,
-   "screen": null,
-   "pad": null,
-   "wrap360": null
-  },
-  "quantityDiscounts": null,
-  "priceMode": "instant",
-  "ringSurcharge": {
-   "polished": null,
-   "black": null
-  },
-  "tiers": {
-   "master": []
-  }
- },
- "master": {
-  "model": "bottle-master/export/SKLUBS_BOTTLE_WEB.glb",
-  "source": "bottle-master/ (v2 : reconstruction contrainte sur la photo originale, validée par calque)",
-  "units": "BODY_HEIGHT = 1 (fond -> bas de la bague)",
-  "bodyRadius": 0.1617,
-  "totalHeight": 1.3205,
-  "parts": {
-   "body": [
-    "BODY",
-    "NECK"
-   ],
-   "cap": [
-    "CAP"
-   ],
-   "handle": [
-    "HANDLE",
-    "HINGE_L",
-    "HINGE_R"
-   ],
-   "ring": [
-    "METAL_RING"
-   ]
-  },
-  "handleNode": "HANDLE",
-  "handleFoldDeg": -90
- },
- "scale": {
-  "sceneUnitsPerBodyHeight": 20,
-  "mmPerBodyHeight": "TO_DEFINE_FACTORY",
-  "_note": "Tant que la cote usine est inconnue, les tailles s'affichent en % de la zone imprimable."
- },
- "ringFinishes": [
-  {
-   "id": "polished",
-   "label": "Inox poli",
-   "color": "#E6E6E3",
-   "metalness": 1.0,
-   "roughness": 0.1
-  },
-  {
-   "id": "black",
-   "label": "Métal noir",
-   "color": "#1C1C1C",
-   "metalness": 0.85,
-   "roughness": 0.32,
-   "confirmed": false
-  }
- ],
- "_unavailable": "Aluminium, Tritan, verre et autres capacités : pas de master 3D ni de donnée usine pour ce modèle. TO_DEFINE_FACTORY.",
- "safeMargin": 0.015,
- "card": {
-  "subtitle": "Inox double paroi · anse sangle · bague inox",
-  "capacity": "à confirmer",
-  "material": "Inox double paroi",
-  "thumbnail": "products/cricket-bottle/thumbnail.webp",
-  "tags": [
-   "Gravure laser",
-   "UV",
-   "Wrap 360°"
+  "defaultSize": "master",
+  "components": [
+    {
+      "id": "body",
+      "label": "Corps"
+    },
+    {
+      "id": "cap",
+      "label": "Bouchon"
+    },
+    {
+      "id": "handle",
+      "label": "Anse"
+    },
+    {
+      "id": "ring",
+      "label": "Bague"
+    }
   ],
-  "order": 1
- },
- "production": {
-  "leadTime": null
- }
+  "materials": [
+    {
+      "id": "steel",
+      "label": "Inox double paroi",
+      "confirmed": false,
+      "finishes": [
+        "matte",
+        "gloss",
+        "softtouch",
+        "brushed"
+      ],
+      "defaultFinish": "matte"
+    }
+  ],
+  "defaultMaterial": "steel",
+  "finishes": {
+    "matte": {
+      "label": "Mat (peinture poudre)",
+      "roughness": 0.62,
+      "metalness": 0.0,
+      "clearcoat": 0.0,
+      "colorable": true
+    },
+    "gloss": {
+      "label": "Brillant",
+      "roughness": 0.16,
+      "metalness": 0.0,
+      "clearcoat": 1.0,
+      "clearcoatRoughness": 0.06,
+      "colorable": true
+    },
+    "softtouch": {
+      "label": "Soft touch",
+      "roughness": 0.85,
+      "metalness": 0.0,
+      "clearcoat": 0.0,
+      "sheen": 0.4,
+      "colorable": true
+    },
+    "brushed": {
+      "label": "Inox brossé naturel",
+      "roughness": 0.34,
+      "metalness": 1.0,
+      "clearcoat": 0.0,
+      "brushed": true,
+      "colorable": false,
+      "fixedColor": "#c8c9c7"
+    }
+  },
+  "colors": {
+    "_note": "Blanc et rouge : visuel Cricket. Les six autres : teintes échantillonnées sur la photo originale du produit. Nuancier usine à confirmer.",
+    "catalog": [
+      {
+        "id": "white",
+        "label": "Blanc",
+        "hex": "#F4F4F1"
+      },
+      {
+        "id": "red",
+        "label": "Rouge",
+        "hex": "#C8102E"
+      },
+      {
+        "id": "black",
+        "label": "Noir",
+        "hex": "#202023"
+      },
+      {
+        "id": "yellow",
+        "label": "Jaune",
+        "hex": "#E0C726"
+      },
+      {
+        "id": "lightblue",
+        "label": "Bleu clair",
+        "hex": "#7BB1D2"
+      },
+      {
+        "id": "orange",
+        "label": "Orange",
+        "hex": "#DB6732"
+      },
+      {
+        "id": "olive",
+        "label": "Vert olive",
+        "hex": "#434638"
+      },
+      {
+        "id": "pink",
+        "label": "Rose",
+        "hex": "#E28195"
+      }
+    ],
+    "defaults": {
+      "body": "#F4F4F1",
+      "cap": "#C8102E",
+      "handle": "#C8102E",
+      "ring": "polished"
+    }
+  },
+  "printZones": [
+    {
+      "id": "front",
+      "label": "Face",
+      "widthRatio": 0.36,
+      "centerU": 0.5
+    },
+    {
+      "id": "back",
+      "label": "Dos",
+      "widthRatio": 0.36,
+      "centerU": 0.0
+    },
+    {
+      "id": "wrap",
+      "label": "Wrap 360°",
+      "widthRatio": 1.0,
+      "centerU": 0.5
+    }
+  ],
+  "printingMethods": [
+    {
+      "id": "laser",
+      "label": "Gravure laser",
+      "render": "engrave",
+      "maxColors": 1,
+      "desc": "Le marquage est gravé : la peinture est retirée et révèle l'inox. Rendu élégant et durable, idéal pour un look premium.",
+      "benefits": [
+        "Résistant aux rayures",
+        "Effet métallique naturel",
+        "Parfait pour les logos",
+        "Monochrome (couleur du métal)"
+      ]
+    },
+    {
+      "id": "uv",
+      "label": "Impression UV",
+      "render": "print",
+      "maxColors": null,
+      "desc": "Impression couleur directe sur la bouteille : détails fins, dégradés et photos.",
+      "benefits": [
+        "Couleurs illimitées",
+        "Dégradés et photos",
+        "Détails fins"
+      ]
+    },
+    {
+      "id": "screen",
+      "label": "Sérigraphie",
+      "render": "print",
+      "maxColors": "TO_DEFINE",
+      "desc": "Encre déposée en aplats à travers un écran : couleurs vives et opaques, pour des logos simples.",
+      "benefits": [
+        "Couleurs vives et opaques",
+        "Adaptée aux logos en aplats",
+        "Nombre de couleurs : à confirmer usine"
+      ]
+    },
+    {
+      "id": "pad",
+      "label": "Tampographie",
+      "render": "print",
+      "maxColors": "TO_DEFINE",
+      "desc": "Tampon souple qui épouse les courbes : marquage précis sur une petite zone.",
+      "benefits": [
+        "Petites zones",
+        "Bonne précision sur surface courbe",
+        "Nombre de couleurs : à confirmer usine"
+      ]
+    },
+    {
+      "id": "wrap360",
+      "label": "Impression 360°",
+      "render": "print",
+      "maxColors": null,
+      "desc": "Impression sur tout le tour de la bouteille, sans interruption.",
+      "benefits": [
+        "Visuel continu sur 360°",
+        "Couleurs illimitées",
+        "Idéal pour motifs et all-over"
+      ]
+    }
+  ],
+  "rules": {
+    "_status": "TO_DEFINE — brouillon technique à valider usine",
+    "methodsByMaterial": {
+      "steel": [
+        "laser",
+        "uv",
+        "screen",
+        "pad",
+        "wrap360"
+      ]
+    },
+    "zonesByMethod": {
+      "laser": [
+        "front",
+        "back",
+        "wrap"
+      ],
+      "uv": [
+        "front",
+        "back",
+        "wrap"
+      ],
+      "screen": [
+        "front",
+        "back"
+      ],
+      "pad": [
+        "front",
+        "back"
+      ],
+      "wrap360": [
+        "wrap"
+      ]
+    }
+  },
+  "quantity": {
+    "moq": "TO_DEFINE",
+    "default": 200,
+    "presets": [
+      100,
+      200,
+      500,
+      1000,
+      2500
+    ]
+  },
+  "pricing": {
+    "_status": "TO_DEFINE — aucun prix n'est inventé. Remplir ces champs active le calcul instantané.",
+    "currency": "EUR",
+    "basePriceBySize": {
+      "master": null
+    },
+    "materialSurcharge": {
+      "steel": null
+    },
+    "finishSurcharge": {
+      "matte": null,
+      "gloss": null,
+      "softtouch": null,
+      "brushed": null
+    },
+    "methodUnitPrice": {
+      "laser": null,
+      "uv": null,
+      "screen": null,
+      "pad": null,
+      "wrap360": null
+    },
+    "extraZoneUnitPrice": null,
+    "setupFee": {
+      "laser": null,
+      "uv": null,
+      "screen": null,
+      "pad": null,
+      "wrap360": null
+    },
+    "quantityDiscounts": null,
+    "priceMode": "instant",
+    "ringSurcharge": {
+      "polished": null,
+      "black": null
+    },
+    "tiers": {
+      "master": []
+    },
+    "taxLabel": "HT"
+  },
+  "master": {
+    "model": "bottle-master/export/SKLUBS_BOTTLE_WEB.glb",
+    "source": "bottle-master/ (v2 : reconstruction contrainte sur la photo originale, validée par calque)",
+    "units": "BODY_HEIGHT = 1 (fond -> bas de la bague)",
+    "bodyRadius": 0.1617,
+    "totalHeight": 1.3205,
+    "parts": {
+      "body": [
+        "BODY",
+        "NECK"
+      ],
+      "cap": [
+        "CAP"
+      ],
+      "handle": [
+        "HANDLE",
+        "HINGE_L",
+        "HINGE_R"
+      ],
+      "ring": [
+        "METAL_RING"
+      ]
+    },
+    "handleNode": "HANDLE",
+    "handleFoldDeg": -90
+  },
+  "scale": {
+    "sceneUnitsPerBodyHeight": 20,
+    "mmPerBodyHeight": "TO_DEFINE_FACTORY",
+    "_note": "Tant que la cote usine est inconnue, les tailles s'affichent en % de la zone imprimable."
+  },
+  "ringFinishes": [
+    {
+      "id": "polished",
+      "label": "Inox poli",
+      "color": "#E6E6E3",
+      "metalness": 1.0,
+      "roughness": 0.1
+    },
+    {
+      "id": "black",
+      "label": "Métal noir",
+      "color": "#1C1C1C",
+      "metalness": 0.85,
+      "roughness": 0.32,
+      "confirmed": false
+    }
+  ],
+  "_unavailable": "Aluminium, Tritan, verre et autres capacités : pas de master 3D ni de donnée usine pour ce modèle. TO_DEFINE_FACTORY.",
+  "safeMargin": 0.015,
+  "card": {
+    "subtitle": "Inox double paroi · anse sangle · bague inox",
+    "capacity": "à confirmer",
+    "material": "Inox double paroi",
+    "thumbnail": "products/cricket-bottle/thumbnail.webp",
+    "tags": [
+      "Gravure laser",
+      "UV",
+      "Wrap 360°"
+    ],
+    "order": 1
+  },
+  "production": {
+    "leadTime": null
+  },
+  "materialsOnRequest": [
+    {
+      "label": "Aluminium",
+      "desc": "Léger et économique"
+    },
+    {
+      "label": "Tritan",
+      "desc": "Sans BPA"
+    },
+    {
+      "label": "Verre",
+      "desc": "Élégant et durable"
+    },
+    {
+      "label": "Personnalisé",
+      "desc": "Matière sur demande"
+    }
+  ],
+  "materialsOnRequestNote": "Pas encore de master 3D ni de donnée usine pour ces matières : précisez-les dans votre demande de devis."
 }

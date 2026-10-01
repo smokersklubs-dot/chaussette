@@ -11,7 +11,7 @@
   <meta name="description" content="Configurez votre bouteille personnalisée en 3D : capacité, matière, couleurs, marquage et quantité.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script type="importmap">
     { "imports": {
@@ -36,42 +36,55 @@
         <div class="viewer-loading" id="loading"><span></span>Chargement du studio 3D</div>
         <div class="viewer-hud top">
           <div class="spec" id="specLine"></div>
-          <div class="hud-actions">
-            <button class="icon-btn" id="handleBtn" title="Rabattre l'anse" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3" /><rect x="5" y="11" width="14" height="4" rx="1.5" /><path d="M8 15v5h8v-5" /></svg>
-            </button>
-            <button class="icon-btn" id="guidesBtn" title="Afficher la zone d'impression" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /><path d="M12 9v6M9 12h6" /></svg>
-            </button>
-            <button class="icon-btn" id="rotateBtn" title="Rotation automatique" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v5h-5" /></svg>
-            </button>
-            <button class="icon-btn" id="resetBtn" title="Recentrer la vue">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
-            </button>
-          </div>
+        </div>
+        <!-- Outils 3D (planche 04) -->
+        <div class="tools" id="tools" role="toolbar" aria-label="Outils 3D">
+          <button class="tool" id="rotateBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v5h-5" /></svg><span>Rotation 360°</span></button>
+          <button class="tool" data-act="zoomin"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5M11 8.5v5M8.5 11h5" /></svg><span>Zoom +</span></button>
+          <button class="tool" data-act="zoomout"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5M8.5 11h5" /></svg><span>Zoom −</span></button>
+          <button class="tool" data-view="back"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4" /><circle cx="12" cy="12" r="3" /></svg><span>Vue arrière</span></button>
+          <button class="tool" data-view="top"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="9" rx="7" ry="3.5" /><path d="M5 9v6c0 1.9 3.1 3.5 7 3.5s7-1.6 7-3.5V9" /></svg><span>Vue de dessus</span></button>
+          <button class="tool" data-view="detail"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h8M8 12h8M8 15h5" /></svg><span>Détails</span></button>
+          <button class="tool" id="explodeBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 3v4M9 5l3-2 3 2M7 10h10M8 13h8v7H8z" /></svg><span>Vue éclatée</span></button>
+          <button class="tool" id="handleBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3" /><rect x="5" y="11" width="14" height="4" rx="1.5" /><path d="M8 15v5h8v-5" /></svg><span>Rabattre l'anse</span></button>
+          <button class="tool" id="guidesBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /><path d="M12 9v6M9 12h6" /></svg><span>Zone d'impression</span></button>
+          <button class="tool" id="resetBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg><span>Recentrer</span></button>
+          <button class="tool" id="fullBtn"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg><span>Plein écran</span></button>
         </div>
         <div class="viewer-hud bottom">
-          <div class="views" id="views" role="group" aria-label="Vues">
-            <button data-view="front" class="is-active">Face</button>
-            <button data-view="back">Dos</button>
-            <button data-view="side">Profil</button>
-            <button data-view="top">Dessus</button>
-            <button data-view="detail">Détail</button>
+          <div class="seg" id="modeSeg" role="group" aria-label="Mode d'aperçu" hidden>
+            <button data-mode="3d" class="is-active">Vue 3D</button>
+            <button data-mode="2d">Gabarit 2D (360°)</button>
           </div>
           <p class="hint" id="hint">Glisser pour tourner · Molette pour zoomer</p>
         </div>
 
+        <!-- Gabarit 2D déroulé (planche 08) -->
+        <div class="template" id="template" hidden>
+          <div class="tpl-sheet">
+            <div class="tpl-canvas"><canvas id="tplCanvas"></canvas><span class="dim w" id="tplW"></span><span class="dim h" id="tplH"></span></div>
+            <ul class="tpl-legend">
+              <li><i class="solid"></i>Zone imprimable</li>
+              <li><i class="dash"></i>Zone de sécurité</li>
+              <li><i class="center"></i>Ligne de centrage</li>
+            </ul>
+          </div>
+        </div>
+
         <aside class="review-card" id="reviewCard" aria-live="polite">
-          <p class="eyebrow">Votre configuration</p>
+          <p class="eyebrow">Vue finale · votre bouteille personnalisée</p>
           <h2 id="reviewTitle">Bouteille</h2>
           <dl id="reviewList"></dl>
           <div class="review-price" id="reviewPrice"></div>
           <div class="review-actions">
-            <button class="btn ghost" id="editBtn">Modifier</button>
-            <button class="btn primary" id="sendBtn">Envoyer le projet</button>
+            <button class="act" id="saveBtn"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z" /><path d="M9 3v5h6M9 14h6M9 17h4" /></svg><span><b>Ajouter au projet</b><small>Sauvegardez cette configuration.</small></span></button>
+            <button class="act" id="sendBtn"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z" /><path d="M8 9h8M8 12h5" /></svg><span><b>Demander un devis</b><small>Recevez une offre détaillée par notre équipe.</small></span></button>
+            <button class="act" id="orderBtn"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h10.2L20 7H6.2" /><circle cx="9" cy="19" r="1.5" /><circle cx="17" cy="19" r="1.5" /></svg><span><b>Commander</b><small id="orderNote">Finalisez votre commande directement en ligne.</small></span></button>
           </div>
-          <button class="link-btn" id="downloadBtn">Télécharger l'aperçu PNG + fichier projet</button>
+          <div class="review-foot">
+            <button class="btn ghost" id="editBtn">Modifier</button>
+            <button class="link-btn" id="downloadBtn">Télécharger le rendu 3D</button>
+          </div>
         </aside>
       </section>
 

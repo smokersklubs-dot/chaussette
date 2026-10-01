@@ -188,10 +188,26 @@ function sklubs_cfg_receive_project(WP_REST_Request $r) {
     if (!is_array($p) || empty($p['product_id'])) return new WP_Error('invalid', 'Projet invalide.', ['status' => 400]);
     $ref = 'PRJ-' . gmdate('ymd') . '-' . strtoupper(wp_generate_password(5, false));
     $qty = (int) ($p['quantity'] ?? 0);
+    // type de demande envoyé par le configurateur : devis, commande ou simple ajout au projet
+    $intents = ['quote' => 'Devis', 'order' => 'Commande', 'save' => 'Projet enregistré'];
+    $intent = isset($intents[$p['intent'] ?? '']) ? $p['intent'] : 'quote';
     $id = wp_insert_post(['post_type' => 'sklubs_project', 'post_status' => 'private',
-        'post_title' => sprintf('%s — %s — %d pcs', $ref, sanitize_text_field($p['product_id']), $qty)], true);
+        'post_title' => sprintf('%s — %s — %s — %d pcs', $ref, $intents[$intent], sanitize_text_field($p['product_id']), $qty)], true);
     if (is_wp_error($id)) return $id;
     $files = [];
+    // logos d'origine (un par élément importé), en plus du visuel déroulé complet
+    foreach (array_slice((array) ($p['artwork_layers'] ?? []), 0, 6) as $i => $layer) {
+        $data = is_array($layer) ? ($layer['data_url'] ?? null) : null;
+        if ($data && preg_match('#^data:image/(png|jpeg);base64,#', $data, $m)) {
+            $bin = base64_decode(substr($data, strpos($data, ',') + 1), true);
+            $info = $bin !== false ? @getimagesizefromstring($bin) : false;
+            if ($info && in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_JPEG], true)) {
+                $up = wp_upload_bits("$ref-logo-" . ($i + 1) . '.' . ($m[1] === 'jpeg' ? 'jpg' : 'png'), null, $bin);
+                if (empty($up['error'])) $files['logo ' . ($i + 1)] = $up['url'];
+            }
+        }
+        if (is_array($layer)) unset($p['artwork_layers'][$i]['data_url']);
+    }
     foreach (['preview_image' => 'apercu', 'artwork' => 'visuel'] as $key => $label) {
         $data = $key === 'artwork' ? ($p['artwork']['data_url'] ?? null) : ($p[$key] ?? null);
         if ($data && preg_match('#^data:image/(png|jpeg);base64,#', $data, $m)) {
@@ -208,8 +224,9 @@ function sklubs_cfg_receive_project(WP_REST_Request $r) {
     update_post_meta($id, '_sklubs_project', wp_slash(wp_json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)));
     update_post_meta($id, '_sklubs_files', $files);
     $price = $p['pricing'] ?? [];
-    wp_mail(get_option('admin_email'), "Nouveau projet configurateur $ref",
-        "Référence : $ref\nProduit : {$p['product_id']}\nQuantité : $qty\nPrix : " .
+    update_post_meta($id, '_sklubs_intent', $intent);
+    wp_mail(get_option('admin_email'), "{$intents[$intent]} configurateur $ref",
+        "Référence : $ref\nDemande : {$intents[$intent]}\nProduit : {$p['product_id']}\nQuantité : $qty\nPrix : " .
         (isset($price['unit']) && $price['unit'] !== null ? number_format((float) $price['unit'], 2, ',', ' ') . ' € / u' : 'sur devis') . "\n\n" .
         implode("\n", array_map(fn($k, $v) => "$k : $v", array_keys($files), $files)) .
         "\n\nDétail : " . admin_url("post.php?post=$id&action=edit"));

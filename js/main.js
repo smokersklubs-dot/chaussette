@@ -42,12 +42,13 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const isMobile = () => matchMedia('(max-width: 860px)').matches;
 
 const STEPS = [
-  { id: 'size',     label: 'Capacité', sub: 'Format du master 3D, reconstruit sur la référence.' },
-  { id: 'material', label: 'Matière',  sub: 'La matière et la finition changent le rendu réel.' },
-  { id: 'colors',   label: 'Couleurs', sub: 'Corps, bouchon et anse se règlent séparément.' },
-  { id: 'marking',  label: 'Marquage', sub: 'Technique, zone et visuel. Glissez le logo sur la bouteille.' },
-  { id: 'quantity', label: 'Quantité', sub: 'Le prix unitaire dépend du volume.' },
-  { id: 'review',   label: 'Récap',    sub: '' },
+  { id: 'material', label: 'Matière & couleur',      short: 'Matière',   sub: 'Choisissez la matière, la couleur et la finition.' },
+  { id: 'cap',      label: 'Bouchon & détails',      short: 'Bouchon',   sub: 'Personnalisez bouchon, anse et anneau métallique.' },
+  { id: 'custom',   label: 'Personnalisation',       short: 'Logo',      sub: 'Ajoutez votre logo, un texte ou un design.' },
+  { id: 'preview',  label: "Aperçu d'impression",    short: 'Aperçu',    sub: 'Vue 3D et gabarit 2D déroulé.' },
+  { id: 'method',   label: "Méthode d'impression",   short: 'Méthode',   sub: 'Choisissez la technique adaptée.' },
+  { id: 'quantity', label: 'Quantité & prix',        short: 'Quantité',  sub: 'Tarif en temps réel selon le volume.' },
+  { id: 'review',   label: 'Vue finale',             short: 'Récap',     sub: '' },
 ];
 
 let product;
@@ -55,8 +56,6 @@ let cfg;
 let step = 0;
 let viewer;
 const artwork = new ArtworkEngine();
-let activeComponent = 'body';
-let patternCanvas = null;
 
 init().catch((err) => {
   console.error(err);
@@ -99,7 +98,7 @@ async function init() {
     e.currentTarget.setAttribute('aria-pressed', String(on));
     viewer.setHandleDown(on);
   });
-  viewer.onView = (name) => $('#views').querySelectorAll('button').forEach((x) => x.classList.toggle('is-active', x.dataset.view === name));
+  viewer.onView = (name) => $('#tools').querySelectorAll('[data-view]').forEach((x) => x.classList.toggle('is-active', x.dataset.view === name));
   artwork.onChange = onArtworkChange;
   await rebuildModel();
   viewer.goTo('hero', true);
@@ -138,16 +137,23 @@ async function rebuildModel() {
   artwork.render();
 }
 
+let lastActiveLayer = -1;
 function onArtworkChange() {
   viewer?.refreshArtwork();
   drawPattern();
   syncSliders();
+  // un clic sur un autre élément (bouteille ou gabarit) le sélectionne : le panneau suit
+  if (artwork.active !== lastActiveLayer) {
+    lastActiveLayer = artwork.active;
+    if (STEPS[step]?.id === 'custom' && cfg) renderStep();
+  }
 }
 
 // ---------- Mise à jour globale ----------
 function update({ model = false, materials = true } = {}) {
   sanitize(product, cfg);
-  cfg.hasArtwork = !!artwork.image;
+  syncZone();
+  cfg.hasArtwork = artwork.hasArt;
   if (model) rebuildModel();
   else if (materials) viewer.applyConfig(cfg, product);
   renderSpec();
@@ -233,7 +239,7 @@ function renderProgress() {
   STEPS.forEach((s, i) => {
     const li = el('li', { class: i === step ? 'active' : i < step ? 'done' : '' });
     li.append(el('button', { onclick: () => goStep(i), 'aria-current': i === step ? 'step' : false },
-      `<span class="n">${String(i + 1).padStart(2, '0')}</span><span class="lbl">${s.label}</span><span class="bar"></span>`));
+      `<span class="n">${String(i + 1).padStart(2, '0')}</span><span class="lbl">${s.short || s.label}</span><span class="bar"></span>`));
     ol.append(li);
   });
 }
@@ -249,23 +255,47 @@ function goStep(i) {
 }
 
 // ---------- Étapes ----------
+let lastStepShown = -1;
+let previewMode = '3d';
+let userGuides = false;
+
 function renderStep(back = false) {
   const s = STEPS[step];
   $('#stepIndex').textContent = `${String(step + 1).padStart(2, '0')} / ${String(STEPS.length).padStart(2, '0')}`;
   $('#stepTitle').textContent = s.label;
   $('#stepSub').textContent = s.sub;
   const body = $('#panelBody');
+  const entering = lastStepShown !== step;
+  const scroll = body.scrollTop;
   body.innerHTML = '';
-  body.classList.remove('enter', 'enter-back');
-  void body.offsetWidth;
-  body.classList.add(back ? 'enter-back' : 'enter');
-  body.scrollTop = 0;
-  patternCanvas = null;
-  ({ size: stepSize, material: stepMaterial, colors: stepColors, marking: stepMarking, quantity: stepQuantity })[s.id]?.(body);
+  if (entering) {
+    body.classList.remove('enter', 'enter-back');
+    void body.offsetWidth;
+    body.classList.add(back ? 'enter-back' : 'enter');
+  }
+  ({ material: stepMaterial, cap: stepCap, custom: stepCustom, preview: stepPreview, method: stepMethod, quantity: stepQuantity })[s.id]?.(body);
+  body.scrollTop = entering ? 0 : scroll;
   $('#prevBtn').disabled = step === 0;
-  $('#nextBtn').textContent = step === STEPS.length - 2 ? 'Voir le récapitulatif' : 'Continuer';
-  if (s.id === 'marking') viewer.goTo(cfg.zone === 'back' ? 'back' : 'front');
-  if (s.id === 'colors' && activeComponent !== 'body') viewer.goTo('cap');
+  $('#nextBtn').textContent = step === STEPS.length - 2 ? 'Voir la vue finale' : 'Continuer';
+  if (entering) enterStep(s.id);
+  lastStepShown = step;
+}
+
+// contexte 3D propre à chaque étape (caméra, vue éclatée, zone d'impression, gabarit)
+function enterStep(id) {
+  setExploded(id === 'cap');
+  setPreviewMode(id === 'preview' ? previewMode : '3d');
+  $('#modeSeg').hidden = id !== 'preview';
+  viewer.setGuides(userGuides || id === 'custom');
+  $('#guidesBtn').setAttribute('aria-pressed', String(userGuides || id === 'custom'));
+  if (id === 'cap') viewer.goTo('explode');
+  else if (id === 'custom' || id === 'preview') viewer.goTo(cfg.zone === 'back' ? 'back' : 'front');
+  else if (id === 'material') viewer.goTo('front');
+}
+
+function setExploded(on) {
+  viewer.setExploded(on);
+  $('#explodeBtn').setAttribute('aria-pressed', String(on));
 }
 
 function group(label, extra = '') {
@@ -274,226 +304,380 @@ function group(label, extra = '') {
   return g;
 }
 const flag = (confirmed) => (confirmed === false ? '<span class="flag">à confirmer</span>' : '');
+const ICON = {
+  check: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.5L16 9.5"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  logo: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12l4-4 4 4"/></svg>',
+  text: '<svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+};
+const METHOD_ICON = {
+  laser: '<svg viewBox="0 0 32 32"><path d="M16 3v9M12 8l4 4 4-4"/><path d="M7 26c3-4 15-4 18 0"/><path d="M16 15v6M13 18l3 3 3-3"/></svg>',
+  uv: '<svg viewBox="0 0 32 32"><rect x="8" y="5" width="16" height="10" rx="2"/><path d="M11 19l-2 4M16 19v5M21 19l2 4"/></svg>',
+  screen: '<svg viewBox="0 0 32 32"><rect x="5" y="7" width="22" height="14" rx="2"/><path d="M9 25h14M12 11h8M12 15h5"/></svg>',
+  pad: '<svg viewBox="0 0 32 32"><path d="M10 6h12v6H10zM12 12h8l3 8H9z"/><path d="M8 26h16"/></svg>',
+  wrap360: '<svg viewBox="0 0 32 32"><ellipse cx="16" cy="16" rx="11" ry="5"/><path d="M25 12.5l2 3.5-4 .5M7 19.5L5 16l4-.5"/></svg>',
+};
 
-function stepSize(body) {
-  const g = group('Capacité');
-  const opts = el('div', { class: 'options' });
-  product.sizes.forEach((s) => {
-    const from = fromPrice(s.id);
-    const cap = s.capacity && s.capacity !== 'TO_DEFINE_FACTORY' ? s.capacity : 'capacité à confirmer';
-    opts.append(el('button', {
-      class: `opt ${cfg.size === s.id ? 'is-active' : ''}`,
-      onclick: () => { cfg.size = s.id; update({ model: true }); renderStep(); },
-    }, `<div class="t">${esc(s.label)}${flag(s.confirmed)}</div>
-        <span class="k">${esc(cap)}${from ? ` · à partir de ${fmtMoney(from, product.pricing?.currency)} / u` : ''}</span>`));
-  });
-  g.append(opts);
-  body.append(g);
-  if (product.sizes.length === 1) body.append(el('p', { class: 'note' }, 'Forme reconstruite sur la photo du produit. D\'autres capacités apparaîtront ici dès qu\'elles seront ajoutées au catalogue.'));
-}
-
-// prix unitaire le plus bas d'une variante (dernier palier, sans options) pour « à partir de »
-function fromPrice(sizeId) {
-  const t = product.pricing?.tiers?.[sizeId];
-  if (!Array.isArray(t)) return null;
-  const u = t.map((x) => Number(x.unit)).filter((x) => Number.isFinite(x) && x > 0);
-  return u.length ? Math.min(...u) : null;
-}
-
+// ----- 01 · Matière & couleur
 function stepMaterial(body) {
-  const g = group('Matière');
-  const opts = el('div', { class: 'options' });
+  if (product.sizes.length > 1) {
+    const g = group('Capacité');
+    const opts = el('div', { class: 'options' });
+    product.sizes.forEach((s) => {
+      const from = fromPrice(s.id);
+      const cap = s.capacity && !/^TO_DEFINE/.test(s.capacity) ? s.capacity : 'capacité à confirmer';
+      opts.append(el('button', {
+        class: `opt ${cfg.size === s.id ? 'is-active' : ''}`,
+        onclick: () => { cfg.size = s.id; update({ model: true }); renderStep(); },
+      }, `<div class="t">${esc(s.label)}${flag(s.confirmed)}</div>
+          <span class="k">${esc(cap)}${from ? ` · à partir de ${fmtMoney(from, product.pricing?.currency)} / u` : ''}</span>`));
+    });
+    g.append(opts);
+    body.append(g);
+  }
+
+  const g = group('Matière du corps');
+  const list = el('div', { class: 'mat-list' });
   product.materials.forEach((m) => {
-    const methods = allowedMethods(product, m.id).map((x) => x.label).join(' · ');
-    opts.append(el('button', {
-      class: `opt ${cfg.material === m.id ? 'is-active' : ''}`,
+    const desc = m.desc || allowedMethods(product, m.id).map((x) => x.label).join(' · ');
+    list.append(el('button', {
+      class: `mat ${cfg.material === m.id ? 'is-active' : ''}`,
       onclick: () => { cfg.material = m.id; cfg.finish = m.defaultFinish; update(); renderStep(); },
-    }, `<div class="t">${esc(m.label)}${flag(m.confirmed)}</div><div class="d">${esc(methods)}</div>`));
+    }, `<span class="mi ${esc(m.id)}"></span><span><b>${esc(m.label)}${flag(m.confirmed)}</b><small>${esc(desc)}</small></span>`));
   });
-  g.append(opts);
+  (product.materialsOnRequest || []).forEach((m) => {
+    list.append(el('button', { class: 'mat off', onclick: () => toast(product.materialsOnRequestNote || 'Sur demande : précisez-le dans votre demande de devis.') },
+      `<span class="mi other"></span><span><b>${esc(m.label)}</b><small>${esc(m.desc || '')}</small></span><span class="req">Sur demande</span>`));
+  });
+  g.append(list);
   body.append(g);
+
+  colorGroup(body, 'body', 'Couleur du corps');
 
   const f = group('Finition');
-  const chips = el('div', { class: 'chips' });
+  const radios = el('div', { class: 'radio-list', role: 'radiogroup' });
   allowedFinishes(product, cfg.material).forEach((fin) => {
-    chips.append(el('button', {
-      class: `chip ${cfg.finish === fin.id ? 'is-active' : ''}`,
+    radios.append(el('button', {
+      class: `radio ${cfg.finish === fin.id ? 'is-active' : ''}`, role: 'radio', 'aria-checked': String(cfg.finish === fin.id),
       onclick: () => { cfg.finish = fin.id; update(); renderStep(); viewer.goTo('detail'); },
-    }, esc(fin.label)));
+    }, `<i></i>${esc(fin.label)}`));
   });
-  f.append(chips);
+  f.append(radios);
   body.append(f);
   if (product.finishes[cfg.finish].colorable === false) {
     body.append(el('p', { class: 'note' }, 'Finition naturelle : la couleur du corps est celle du métal.'));
   }
 }
 
-function stepColors(body) {
-  const tabs = el('div', { class: 'tabs', role: 'tablist' });
-  product.components.forEach((c) => {
-    const color = c.id === 'body' ? bodyColorShown() : c.id === 'ring' ? (product.ringFinishes.find((f) => f.id === cfg.colors.ring)?.color || '#ccc') : cfg.colors[c.id];
-    tabs.append(el('button', {
-      class: activeComponent === c.id ? 'is-active' : '', role: 'tab', 'aria-selected': activeComponent === c.id ? 'true' : 'false',
-      onclick: () => { activeComponent = c.id; renderStep(); viewer.goTo(c.id === 'body' ? 'front' : 'cap'); },
-    }, `<span class="dot" style="background:${color}"></span>${esc(c.label)}`));
-  });
-  body.append(tabs);
+function partColor(part) { return part === 'body' ? bodyColorShown() : cfg.colors[part]; }
+function colorName(hex) { return product.colors.catalog.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.label || hex.toUpperCase(); }
 
-  if (activeComponent === 'ring') {
-    const rg = group('Finition de la bague', `<b>${esc(ringLabel())}</b>`);
-    const chips = el('div', { class: 'chips' });
-    product.ringFinishes.forEach((f) => chips.append(el('button', {
-      class: `chip ${cfg.colors.ring === f.id ? 'is-active' : ''}`,
-      onclick: () => { cfg.colors.ring = f.id; update(); renderStep(); viewer.goTo('cap'); },
-    }, `${esc(f.label)}${f.confirmed === false ? ' <span class="flag">à confirmer</span>' : ''}`)));
-    rg.append(chips);
-    body.append(rg);
-    body.append(el('p', { class: 'note' }, 'La bague métallique sépare le corps du bouchon. Inox poli : finition visible sur la référence.'));
-    return;
-  }
-  const locked = activeComponent === 'body' && product.finishes[cfg.finish].colorable === false;
-  const g = group(`Couleur ${labelOf(product.components, activeComponent).toLowerCase()}`, `<b>${esc(currentColorName())}</b>`);
-  if (locked) {
+// Nuancier + couleur personnalisée (HEX) + référence Pantone, pour une pièce
+function colorGroup(body, part, title) {
+  const g = group(title, `<b>${esc(colorName(partColor(part)))}</b>`);
+  if (part === 'body' && product.finishes[cfg.finish].colorable === false) {
     g.append(el('p', { class: 'note' }, 'Inox brossé naturel : pas de coloration du corps. Choisissez une finition peinte pour colorer.'));
     body.append(g);
     return;
   }
+  const cur = cfg.colors[part].toLowerCase();
   const sw = el('div', { class: 'swatches' });
-  product.colors.catalog.forEach((c) => {
-    sw.append(el('button', {
-      class: `swatch ${cfg.colors[activeComponent].toLowerCase() === c.hex.toLowerCase() ? 'is-active' : ''}`,
-      style: `background:${c.hex}`, title: c.label, 'aria-label': c.label,
-      onclick: () => setColor(c.hex, ''),
-    }));
-  });
-  const custom = !product.colors.catalog.some((c) => c.hex.toLowerCase() === cfg.colors[activeComponent].toLowerCase());
-  sw.append(el('button', { class: `swatch custom ${custom ? 'is-active' : ''}`, title: 'Couleur personnalisée', 'aria-label': 'Couleur personnalisée', onclick: () => $('#pick')?.click() }));
+  product.colors.catalog.forEach((c) => sw.append(el('button', {
+    class: `swatch ${cur === c.hex.toLowerCase() ? 'is-active' : ''}`, style: `background:${c.hex}`, title: c.label, 'aria-label': c.label,
+    onclick: () => setPartColor(part, c.hex, ''),
+  })));
   g.append(sw);
-  body.append(g);
 
-  const cg = group('Couleur personnalisée');
-  const row = el('div', { class: 'custom-color' });
-  const hex = cfg.colors[activeComponent];
-  const picker = el('input', { type: 'color', id: 'pick', value: hex, 'aria-label': 'Sélecteur' });
-  const hexIn = el('label', { class: 'field' }, `<span>HEX</span>`);
-  const hexInput = el('input', { class: 'input', value: hex.toUpperCase(), maxlength: 7, spellcheck: 'false' });
-  hexIn.append(hexInput);
-  const rgbIn = el('label', { class: 'field' }, `<span>RGB</span>`);
-  const rgbInput = el('input', { class: 'input', value: hexToRgb(hex).join(', '), spellcheck: 'false' });
-  rgbIn.append(rgbInput);
-  picker.addEventListener('input', () => setColor(picker.value, null, false));
+  const custom = !product.colors.catalog.some((c) => c.hex.toLowerCase() === cur);
+  const row = el('div', { class: `custom-row ${custom ? 'is-active' : ''}` });
+  const picker = el('input', { type: 'color', value: cfg.colors[part], 'aria-label': 'Couleur personnalisée' });
+  const lab = el('label', { class: 'cc-btn', title: 'Couleur personnalisée' }, `<span class="plus">${ICON.plus}</span>`);
+  lab.prepend(picker);
+  const hexInput = el('input', { class: 'input', value: cfg.colors[part].toUpperCase(), maxlength: 7, spellcheck: 'false', 'aria-label': 'HEX' });
+  const refInput = el('input', { class: 'input', value: cfg.colorRefs[part] || '', placeholder: 'Pantone (ex. PMS 1585 C)', 'aria-label': 'Référence Pantone' });
+  picker.addEventListener('input', () => { hexInput.value = picker.value.toUpperCase(); setPartColor(part, picker.value, null, false); });
   picker.addEventListener('change', () => renderStep());
-  hexInput.addEventListener('change', () => {
-    const v = normalizeHex(hexInput.value);
-    if (v) setColor(v); else toast('Format HEX attendu : #RRGGBB');
-  });
-  rgbInput.addEventListener('change', () => {
-    const p = rgbInput.value.split(/[,\s]+/).map(Number).filter((n) => !Number.isNaN(n));
-    if (p.length === 3 && p.every((n) => n >= 0 && n <= 255)) setColor(rgbToHex(p)); else toast('Format RGB attendu : 255, 107, 0');
-  });
-  row.append(picker, hexIn, rgbIn);
-  cg.append(row);
-  const ref = el('label', { class: 'field', style: 'margin-top:10px' }, '<span>Référence Pantone / usine (optionnel)</span>');
-  const refInput = el('input', { class: 'input', value: cfg.colorRefs[activeComponent] || '', placeholder: 'ex. PMS 186 C' });
-  refInput.addEventListener('input', () => { cfg.colorRefs[activeComponent] = refInput.value.trim(); });
-  ref.append(refInput);
-  cg.append(ref);
-  cg.append(el('p', { class: 'note' }, 'Les couleurs écran sont indicatives. Une référence Pantone garantit la teinte en production.'));
-  body.append(cg);
+  hexInput.addEventListener('change', () => { const v = normalizeHex(hexInput.value); if (v) setPartColor(part, v); else toast('Format HEX attendu : #RRGGBB'); });
+  refInput.addEventListener('input', () => { cfg.colorRefs[part] = refInput.value.trim(); });
+  row.append(lab, el('span', { class: 'cc-l' }, 'Couleur personnalisée'), hexInput);
+  g.append(row, refInput);
+  refInput.classList.add('ref');
+  body.append(g);
 }
 
-function currentColorName() {
-  const hex = activeComponent === 'body' ? bodyColorShown() : cfg.colors[activeComponent];
-  return product.colors.catalog.find((c) => c.hex.toLowerCase() === hex.toLowerCase())?.label || hex.toUpperCase();
-}
-
-function setColor(hex, ref = null, rerender = true) {
-  cfg.colors[activeComponent] = hex;
-  if (ref !== null) cfg.colorRefs[activeComponent] = ref;
+function setPartColor(part, hex, ref = null, rerender = true) {
+  cfg.colors[part] = hex;
+  if (ref !== null) cfg.colorRefs[part] = ref;
   update({ materials: true });
   artwork.render();
   if (rerender) renderStep();
 }
 
-function stepMarking(body) {
-  const mg = group('Technique');
+// ----- 02 · Bouchon & détails
+function stepCap(body) {
+  const tg = group('Type de bouchon');
+  const caps = el('div', { class: 'cap-types' });
+  caps.append(el('button', { class: 'cap-type is-active', 'aria-pressed': 'true' },
+    `<svg viewBox="0 0 48 48"><path d="M16 22v-9a8 8 0 0116 0v9" stroke-width="3"/><rect x="12" y="20" width="24" height="12" rx="3"/><rect x="13" y="32" width="22" height="4" rx="1"/></svg><span>Bouchon à anse</span>`));
+  tg.append(caps, el('p', { class: 'note' }, 'Bouchon du modèle reconstruit. Autres bouchons (sport, paille) : pas encore modélisés pour ce produit.'));
+  body.append(tg);
+
+  colorGroup(body, 'cap', 'Couleur du bouchon');
+  colorGroup(body, 'handle', "Couleur de l'anse");
+
+  const rg = group('Anneau métallique', `<b>${esc(ringLabel())}</b>`);
   const chips = el('div', { class: 'chips' });
-  const allowed = allowedMethods(product, cfg.material);
-  product.printingMethods.forEach((m) => {
-    if (!allowed.some((a) => a.id === m.id)) return; // jamais de technique impossible
-    chips.append(el('button', {
-      class: `chip ${cfg.method === m.id ? 'is-active' : ''}`,
-      onclick: () => { cfg.method = m.id; update(); renderStep(); },
-    }, esc(m.label)));
-  });
-  mg.append(chips);
-  const method = product.printingMethods.find((m) => m.id === cfg.method);
-  if (method?.render === 'engrave') mg.append(el('p', { class: 'note' }, 'Gravure : le visuel devient monochrome et révèle le métal. Rendu réagissant à la lumière.'));
-  body.append(mg);
+  product.ringFinishes.forEach((f) => chips.append(el('button', {
+    class: `chip ring ${cfg.colors.ring === f.id ? 'is-active' : ''}`,
+    onclick: () => { cfg.colors.ring = f.id; update(); renderStep(); },
+  }, `<i style="background:${f.color}"></i>${esc(f.label)}${f.confirmed === false ? ' <span class="flag">à confirmer</span>' : ''}`)));
+  rg.append(chips);
+  body.append(rg);
 
-  const zg = group('Zone');
-  const zc = el('div', { class: 'chips' });
-  allowedZones(product, cfg.method).forEach((z) => {
-    zc.append(el('button', {
-      class: `chip ${cfg.zone === z.id ? 'is-active' : ''}`,
-      onclick: () => {
-        cfg.zone = z.id;
-        artwork.setZone(z);
-        if (z.id === 'wrap') artwork.t.x = 0;
-        artwork.render();
-        update();
-        renderStep();
-        viewer.goTo(z.id === 'back' ? 'back' : z.id === 'wrap' ? 'side' : 'front');
-      },
-    }, esc(z.label)));
-  });
-  zg.append(zc);
-  body.append(zg);
+  const eg = group('Vue');
+  const ex = el('div', { class: 'chips' });
+  const exploded = $('#explodeBtn').getAttribute('aria-pressed') === 'true';
+  ex.append(
+    el('button', { class: `chip ${exploded ? 'is-active' : ''}`, onclick: () => { setExploded(true); viewer.goTo('explode'); renderStep(); } }, 'Vue éclatée'),
+    el('button', { class: `chip ${!exploded ? 'is-active' : ''}`, onclick: () => { setExploded(false); renderStep(); } }, 'Assemblée'),
+  );
+  eg.append(ex);
+  body.append(eg);
+}
 
-  const ag = group('Visuel', artwork.image ? '' : '<b>PNG · JPG · SVG</b>');
-  if (!artwork.image) {
-    const drop = el('button', { class: 'drop', onclick: () => $('#fileInput').click() },
-      `<svg viewBox="0 0 24 24" style="width:22px;height:22px"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
-       <span class="t">Importer votre logo</span><span class="d">Glissez un fichier ici ou cliquez. Idéalement PNG transparent ou SVG.</span>`);
-    ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
-    ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove('over')));
-    drop.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
-    ag.append(drop);
-  } else {
-    const row = el('div', { class: 'file-row' });
-    const th = el('span', { class: 'thumb' });
-    th.style.backgroundImage = `url(${artwork.image.toDataURL()})`;
-    row.append(th, el('span', { class: 'n' }, esc(artwork.name)),
-      el('button', { onclick: () => $('#fileInput').click() }, 'Remplacer'),
-      el('button', { onclick: () => { artwork.clear(); artwork.render(); update(); renderStep(); } }, 'Retirer'));
-    ag.append(row);
+// ----- 03 · Personnalisation
+const FONTS = [
+  { id: 'Inter Tight', label: 'Moderne' },
+  { id: 'Instrument Serif', label: 'Élégante' },
+  { id: 'JetBrains Mono', label: 'Technique' },
+];
+const TEXT_COLORS = ['#111111', '#FFFFFF', '#FF6B00'];
+
+function stepCustom(body) {
+  const tg = group('Ajouter');
+  const tools = el('div', { class: 'add-tools' });
+  tools.append(
+    el('button', { class: 'add', onclick: () => { replaceNext = false; $('#fileInput').click(); } }, `${ICON.logo}<span><b>Importer un logo</b><small>PNG, JPG ou SVG</small></span>`),
+    el('button', { class: 'add', onclick: addText }, `${ICON.text}<span><b>Ajouter un texte</b><small>Nom, slogan, date…</small></span>`),
+  );
+  const drop = tools.firstChild;
+  ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove('over')));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+  tg.append(tools);
+  body.append(tg);
+
+  if (artwork.hasArt) {
+    const lg = group('Éléments', `<b>${artwork.layers.length}</b>`);
+    const list = el('div', { class: 'layers' });
+    artwork.layers.forEach((l, i) => {
+      const row = el('div', { class: `layer ${i === artwork.active ? 'is-active' : ''}` });
+      const th = el('span', { class: 'thumb' });
+      th.style.backgroundImage = `url(${l.image.toDataURL()})`;
+      const pick = el('button', { class: 'n', onclick: () => { artwork.select(i); renderStep(); } }, esc(l.kind === 'text' ? l.textOpts.text.replace(/\n/g, ' ') : l.name));
+      row.append(th, pick, el('button', { class: 'del', title: 'Retirer', 'aria-label': 'Retirer', onclick: () => { artwork.select(i); artwork.removeActive(); artwork.render(); update(); renderStep(); } }, ICON.trash));
+      list.append(row);
+    });
+    lg.append(list);
+    body.append(lg);
   }
-  body.append(ag);
 
-  const pg = group('Patron déroulé', '<b>2D ↔ 3D</b>');
-  const wrap = el('div', { class: 'pattern-wrap' });
-  patternCanvas = el('canvas');
-  const cw = 820;
-  patternCanvas.width = cw;
-  patternCanvas.height = Math.round((cw * artwork.pattern.height) / artwork.pattern.circumference);
-  wrap.append(patternCanvas);
-  pg.append(wrap);
-  pg.append(el('div', { class: 'pattern-cap' }, `<span>360° · déroulé du corps</span><span>${typeof product.scale.mmPerBodyHeight === 'number' ? fmtLen(artwork.pattern.circumference) : 'cotes à confirmer'}</span>`));
-  bindPatternDrag(patternCanvas);
-
-  if (artwork.image) {
-    pg.append(slider('Taille', 'size', 0.5, artwork.maxWidth(), 0.1, artwork.t.width, (v) => fmtLen(v, zoneWidth()), (v) => { artwork.t.width = v; }));
-    pg.append(slider('Rotation', 'rot', -180, 180, 1, artwork.t.rotation, (v) => `${Math.round(v)}°`, (v) => { artwork.t.rotation = v; }));
-    const acts = el('div', { class: 'mini-actions' });
+  const L = artwork.layer;
+  if (L?.kind === 'text') {
+    const xg = group('Texte');
+    const ta = el('textarea', { class: 'input area', rows: 2, maxlength: 80, spellcheck: 'false' });
+    ta.value = L.textOpts.text;
+    ta.addEventListener('input', () => { if (ta.value.trim()) { artwork.setText({ text: ta.value }, L); artwork.render(); syncLayerName(); } });
+    xg.append(ta);
+    const fonts = el('div', { class: 'chips' });
+    FONTS.forEach((f) => fonts.append(el('button', { class: `chip ${L.textOpts.font === f.id ? 'is-active' : ''}`, style: `font-family:'${f.id}'`, onclick: () => setTextOpt({ font: f.id }) }, f.label)));
+    fonts.append(
+      el('button', { class: `chip ${L.textOpts.weight >= 700 ? 'is-active' : ''}`, onclick: () => setTextOpt({ weight: L.textOpts.weight >= 700 ? 400 : 700 }) }, '<b>Gras</b>'),
+      el('button', { class: `chip ${L.textOpts.italic ? 'is-active' : ''}`, onclick: () => setTextOpt({ italic: !L.textOpts.italic }) }, '<i>Italique</i>'),
+    );
+    xg.append(fonts);
+    const cols = el('div', { class: 'swatches small' });
+    [...TEXT_COLORS, ...product.colors.catalog.map((c) => c.hex)].filter((h, i, a) => a.findIndex((x) => x.toLowerCase() === h.toLowerCase()) === i).forEach((h) =>
+      cols.append(el('button', { class: `swatch ${L.textOpts.color.toLowerCase() === h.toLowerCase() ? 'is-active' : ''}`, style: `background:${h}`, 'aria-label': h, onclick: () => setTextOpt({ color: h }) })));
+    xg.append(el('div', { class: 'label sub' }, '<span>Couleur</span>'), cols);
+    if (product.printingMethods.find((m) => m.id === cfg.method)?.render === 'engrave') xg.append(el('p', { class: 'note' }, 'Gravure laser : la couleur du texte est celle du métal révélé.'));
+    body.append(xg);
+  }
+  if (L) {
+    const pg = group('Position · taille · rotation', '<b>Glissez l\'élément sur la bouteille</b>');
+    const acts = el('div', { class: 'chips' });
+    const mv = (fn) => () => { fn(artwork.t); artwork.clampTransform(); artwork.render(); };
     acts.append(
-      el('button', { class: 'chip', onclick: () => { artwork.t.x = 0; artwork.t.y = 0; artwork.clampTransform(); artwork.render(); } }, 'Centrer'),
-      el('button', { class: 'chip', onclick: () => { artwork.t.width = artwork.maxWidth(); artwork.t.x = 0; artwork.t.y = 0; artwork.clampTransform(); artwork.render(); } }, 'Taille max'),
-      el('button', { class: 'chip', onclick: () => { artwork.t.rotation = 0; artwork.render(); } }, 'Rotation 0°'),
+      el('button', { class: 'chip', onclick: mv((t) => { t.x = 0; t.y = 0; }) }, 'Centrer'),
+      el('button', { class: 'chip', onclick: mv((t) => { t.y = 99; }) }, 'Haut'),
+      el('button', { class: 'chip', onclick: mv((t) => { t.y = -99; }) }, 'Bas'),
+      el('button', { class: 'chip', onclick: mv((t) => { t.width = artwork.maxWidth(); }) }, 'Taille max'),
+      el('button', { class: 'chip', onclick: mv((t) => { t.rotation = 0; }) }, 'Rotation 0°'),
     );
     pg.append(acts);
+    pg.append(slider('Taille', 'size', 0.5, artwork.maxWidth(), 0.1, artwork.t.width, (v) => fmtLen(v, zoneWidth()), (v) => { artwork.t.width = v; }));
+    pg.append(slider('Rotation', 'rot', -180, 180, 1, artwork.t.rotation, (v) => `${Math.round(v)}°`, (v) => { artwork.t.rotation = v; }));
+    if (L.kind === 'image') pg.append(el('button', { class: 'link-btn', onclick: () => { replaceNext = true; $('#fileInput').click(); } }, 'Remplacer ce logo'));
+    body.append(pg);
   }
-  body.append(pg);
+
+  const zg = group("Zones d'impression");
+  const zones = el('div', { class: 'zones' });
+  const possible = new Set(allowedMethods(product, cfg.material).flatMap((m) => allowedZones(product, m.id).map((z) => z.id)));
+  product.printZones.forEach((z) => {
+    if (!possible.has(z.id)) return;
+    zones.append(el('button', { class: `zone ${cfg.zone === z.id ? 'is-active' : ''}`, onclick: () => setZone(z.id) }, `${zoneIcon(z.id)}<span>${esc(z.label)}</span>`));
+  });
+  zg.append(zones);
+  body.append(zg);
+  if (!artwork.hasArt) body.append(el('p', { class: 'note' }, 'Astuce : déposez votre fichier directement sur la bouteille.'));
+}
+
+function zoneIcon(id) {
+  const band = id === 'wrap' ? '<rect x="10" y="22" width="20" height="18" fill="currentColor" opacity=".35" stroke="none"/>'
+    : id === 'back' ? '<rect x="15" y="24" width="10" height="13" rx="1" stroke-dasharray="2 2"/>' : '<rect x="15" y="24" width="10" height="13" rx="1" fill="currentColor" opacity=".35"/>';
+  return `<svg viewBox="0 0 40 48"><path d="M16 4h8v6h-8zM16 10h8v2c4 2 6 4 6 8v22a3 3 0 01-3 3H13a3 3 0 01-3-3V20c0-4 2-6 6-8z"/>${band}</svg>`;
+}
+
+function setZone(id) {
+  if (!allowedZones(product, cfg.method).some((z) => z.id === id)) {
+    const m = allowedMethods(product, cfg.material).find((x) => allowedZones(product, x.id).some((z) => z.id === id));
+    if (m) { cfg.method = m.id; toast(`Technique adaptée à cette zone : ${m.label}.`); }
+  }
+  cfg.zone = id;
+  syncZone(true);
+  update();
+  renderStep();
+  viewer.goTo(id === 'back' ? 'back' : id === 'wrap' ? 'side' : 'front');
+}
+
+// la zone du visuel suit la configuration (après un changement de technique ou de zone)
+function syncZone(reset = false) {
+  if (artwork.zone?.id === cfg.zone && !reset) return;
+  const z = product.printZones.find((x) => x.id === cfg.zone);
+  if (!z) return;
+  artwork.setZone(z);
+  if (z.id === 'wrap') artwork.layers.forEach((l) => { l.t.x = 0; });
+  artwork.render();
+}
+
+function addText() {
+  const n = artwork.layers.filter((l) => l.kind === 'text').length;
+  const color = luminance(bodyColorShown()) > 0.6 ? '#111111' : '#FFFFFF';
+  artwork.setText({ text: n ? 'Votre slogan' : 'Votre texte', color });
+  artwork.render();
+  update();
+  renderStep();
+  viewer.goTo(cfg.zone === 'back' ? 'back' : 'front');
+  setTimeout(() => $('#panelBody textarea')?.select(), 60);
+}
+
+function setTextOpt(o) {
+  artwork.setText(o, artwork.layer);
+  artwork.render();
+  renderStep();
+}
+
+function syncLayerName() {
+  const n = $('#panelBody .layer.is-active .n');
+  if (n) n.textContent = artwork.layer.textOpts.text.replace(/\n/g, ' ');
+}
+
+function luminance(hex) { const [r, g, b] = hexToRgb(hex); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; }
+
+// ----- 04 · Aperçu d'impression
+function stepPreview(body) {
+  const vg = group('Vues');
+  const views = el('div', { class: 'view-list' });
+  [['front', 'Avant'], ['back', 'Arrière'], ['side', 'Droite'], ['left', 'Gauche']].forEach(([v, label]) =>
+    views.append(el('button', { class: 'view-btn', onclick: () => { setPreviewMode('3d'); viewer.setAutoRotate(false); $('#rotateBtn').setAttribute('aria-pressed', 'false'); viewer.goTo(v); } }, label)));
+  views.append(el('button', { class: 'view-btn', onclick: () => { setPreviewMode('3d'); viewer.goTo('front'); setTimeout(() => { viewer.setAutoRotate(true); $('#rotateBtn').setAttribute('aria-pressed', 'true'); }, 600); } }, '360°'));
+  vg.append(views);
+  body.append(vg);
+
+  const mg = group('Gabarit');
+  const seg = el('div', { class: 'seg block' });
+  [['3d', 'Vue 3D'], ['2d', 'Gabarit 2D (360°)']].forEach(([m, label]) =>
+    seg.append(el('button', { class: previewMode === m ? 'is-active' : '', onclick: () => { setPreviewMode(m); renderStep(); } }, label)));
+  mg.append(seg);
+  const known = typeof product.scale.mmPerBodyHeight === 'number';
+  const dims = el('dl', { class: 'dims' });
+  dims.innerHTML = `<dt>Déroulé 360°</dt><dd>${known ? fmtLen(artwork.pattern.circumference) : 'à confirmer usine'}</dd>
+    <dt>Hauteur imprimable</dt><dd>${known ? fmtLen(artwork.pattern.height) : 'à confirmer usine'}</dd>
+    <dt>Zone</dt><dd>${esc(labelOf(product.printZones, cfg.zone))}</dd>
+    <dt>Éléments</dt><dd>${artwork.layers.length || 'aucun'}</dd>`;
+  mg.append(dims);
+  mg.append(el('p', { class: 'note' }, 'Le gabarit montre la bouteille déroulée : la zone imprimable (trait plein), la zone de sécurité (tirets orange) et la ligne de centrage. Les éléments se déplacent aussi sur le gabarit.'));
+  body.append(mg);
+  if (!artwork.hasArt) body.append(el('p', { class: 'note warn' }, 'Aucun logo ni texte : ajoutez-les à l\'étape Personnalisation.'));
+}
+
+function setPreviewMode(mode) {
+  if (STEPS[step]?.id === 'preview') previewMode = mode;
+  const on = mode === '2d';
+  $('#template').hidden = !on;
+  $('#viewer').classList.toggle('is-2d', on);
+  $('#modeSeg').querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.mode === mode));
+  if (on) drawTemplate();
+}
+
+let tplBound = false;
+function drawTemplate() {
+  const c = $('#tplCanvas');
+  const box = $('#template .tpl-canvas');
+  const wrap = $('#template');
+  const maxW = Math.max(200, wrap.clientWidth - (isMobile() ? 48 : 200));
+  const ratio = artwork.pattern.height / artwork.pattern.circumference;
+  const maxH = Math.max(120, wrap.clientHeight - (isMobile() ? 170 : 230));
+  const w = Math.min(maxW, maxH / ratio);
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.round(w * dpr);
+  c.height = Math.round(w * ratio * dpr);
+  c.style.width = `${Math.round(w)}px`;
+  c.style.height = `${Math.round(w * ratio)}px`;
+  box.style.width = `${Math.round(w)}px`;
+  const known = typeof product.scale.mmPerBodyHeight === 'number';
+  $('#tplW').textContent = known ? fmtLen(artwork.pattern.circumference) : 'déroulé 360° · cote à confirmer';
+  $('#tplH').textContent = known ? fmtLen(artwork.pattern.height) : 'hauteur à confirmer';
+  if (!tplBound) { bindPatternDrag(c); tplBound = true; }
   drawPattern();
+}
+
+// ----- 05 · Méthode d'impression
+function stepMethod(body) {
+  const allowed = allowedMethods(product, cfg.material).map((m) => m.id);
+  const grid = el('div', { class: 'method-grid' });
+  product.printingMethods.forEach((m) => {
+    const ok = allowed.includes(m.id);
+    grid.append(el('button', {
+      class: `mcard ${cfg.method === m.id ? 'is-active' : ''}`, disabled: !ok, title: ok ? '' : 'Non compatible avec la matière choisie',
+      onclick: () => setMethod(m.id),
+    }, `${METHOD_ICON[m.id] || METHOD_ICON.uv}<span>${esc(m.label)}</span>`));
+  });
+  body.append(grid);
+
+  const m = product.printingMethods.find((x) => x.id === cfg.method);
+  if (m) {
+    const zones = allowedZones(product, m.id).map((z) => z.label).join(' · ');
+    const card = el('div', { class: 'mdetail' });
+    card.innerHTML = `<h3>${esc(m.label)}</h3>${m.desc ? `<p>${esc(m.desc)}</p>` : ''}
+      <ul>${(m.benefits || []).map((b) => `<li>${ICON.check}${esc(b)}</li>`).join('')}</ul>
+      <dl class="dims"><dt>Zones</dt><dd>${esc(zones)}</dd>
+      <dt>Couleurs</dt><dd>${m.maxColors === null ? 'illimitées' : typeof m.maxColors === 'number' ? `${m.maxColors} max` : 'à confirmer usine'}</dd></dl>`;
+    body.append(card);
+  }
+  if (!artwork.hasArt) body.append(el('p', { class: 'note' }, 'Sans logo ni texte, la bouteille est livrée sans marquage : la technique s\'applique dès que vous ajoutez un élément.'));
+}
+
+function setMethod(id) {
+  const prevZone = cfg.zone;
+  cfg.method = id;
+  update();
+  if (cfg.zone !== prevZone) toast(`Zone ajustée : ${labelOf(product.printZones, cfg.zone)} (compatible ${labelOf(product.printingMethods, id)}).`);
+  renderStep();
+  viewer.goTo(cfg.zone === 'back' ? 'back' : cfg.zone === 'wrap' ? 'side' : 'front');
 }
 
 function slider(label, key, min, max, stepV, value, fmt, apply) {
@@ -520,8 +704,9 @@ function syncSliders() {
 }
 
 function drawPattern() {
-  if (!patternCanvas) return;
-  artwork.drawEditor(patternCanvas, { bodyColor: bodyColorShown(), engrave: product.printingMethods.find((m) => m.id === cfg.method)?.render === 'engrave', engraveColor: viewer.engraveColor || '#c9cac7' });
+  const c = $('#tplCanvas');
+  if (!c || $('#template').hidden) return;
+  artwork.drawEditor(c, { bodyColor: bodyColorShown(), engrave: product.printingMethods.find((m) => m.id === cfg.method)?.render === 'engrave', engraveColor: viewer.engraveColor || '#c9cac7' });
 }
 
 function bindPatternDrag(canvas) {
@@ -531,7 +716,7 @@ function bindPatternDrag(canvas) {
     return { u: (e.clientX - r.left) / r.width, v: 1 - (e.clientY - r.top) / r.height };
   };
   canvas.addEventListener('pointerdown', (e) => {
-    if (!artwork.image) { $('#fileInput').click(); return; }
+    if (!artwork.hasArt) { replaceNext = false; $('#fileInput').click(); return; }
     const p = uv(e);
     const c = artwork.uvToCm(p.u, p.v);
     if (artwork.hit(p.u, p.v)) drag = { dx: artwork.t.x - c.x, dy: artwork.t.y - c.y };
@@ -551,7 +736,7 @@ function bindPatternDrag(canvas) {
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
   canvas.addEventListener('wheel', (e) => {
-    if (!artwork.image) return;
+    if (!artwork.hasArt) return;
     e.preventDefault();
     artwork.t.width *= e.deltaY < 0 ? 1.05 : 0.95;
     artwork.clampTransform();
@@ -559,6 +744,7 @@ function bindPatternDrag(canvas) {
   }, { passive: false });
 }
 
+let replaceNext = false;
 async function handleFile(file) {
   const okTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
   if (!okTypes.includes(file.type)) {
@@ -567,24 +753,25 @@ async function handleFile(file) {
   }
   if (file.size > 15 * 1024 * 1024) { toast('Fichier trop lourd (15 Mo max).'); return; }
   try {
-    await artwork.loadFile(file);
+    await artwork.loadFile(file, replaceNext);
+    replaceNext = false;
     artwork.render();
     update();
-    if (STEPS[step].id !== 'marking') goStep(STEPS.findIndex((s) => s.id === 'marking'));
-    else renderStep();
+    const custom = STEPS.findIndex((s) => s.id === 'custom');
+    if (step !== custom) goStep(custom); else renderStep();
     viewer.goTo(cfg.zone === 'back' ? 'back' : 'front');
-    toast('Visuel appliqué. Glissez-le directement sur la bouteille.');
+    toast('Logo appliqué. Glissez-le directement sur la bouteille.');
   } catch (err) {
     toast(`Lecture impossible : ${err.message}`);
   }
 }
 
+// ----- 06 · Quantité & prix
 function stepQuantity(body) {
   const g = group('Quantité');
   const q = el('div', { class: 'qty' });
   const input = el('input', { type: 'number', min: 1, step: 1, value: cfg.quantity, inputmode: 'numeric', 'aria-label': 'Quantité' });
-  const set = (v) => { cfg.quantity = Math.max(1, Math.round(v) || 1); input.value = cfg.quantity; update({ materials: false }); markPresets(); markTiers(); };
-  const markTiers = () => body.querySelectorAll('.tier').forEach((t) => t.classList.toggle('is-active', computePrice(product, cfg).tiers?.find((x) => x.active)?.min === Number(t.dataset.q)));
+  const set = (v) => { cfg.quantity = Math.max(1, Math.round(v) || 1); input.value = cfg.quantity; update({ materials: false }); renderStep(); };
   q.append(el('button', { 'aria-label': 'Moins', onclick: () => set(cfg.quantity - stepFor(cfg.quantity)) }, '−'), input,
     el('button', { 'aria-label': 'Plus', onclick: () => set(cfg.quantity + stepFor(cfg.quantity)) }, '+'));
   input.addEventListener('change', () => set(Number(input.value)));
@@ -592,64 +779,82 @@ function stepQuantity(body) {
   body.append(g);
 
   const p = computePrice(product, cfg);
-  const pg = group('Paliers de prix', p.leadTime ? `<b>Délai : ${esc(p.leadTime)}</b>` : '');
+  const tax = product.pricing?.taxLabel ? ` ${product.pricing.taxLabel}` : '';
+  const pg = group('Paliers de prix', p.tiers?.length ? '<b>Prix unitaire</b>' : '');
   const tiers = product.pricing?.tiers?.[cfg.size];
-  let markPresets = () => {};
   if (p.tiers && p.tiers.length) {
     const tbl = el('div', { class: 'tiers', role: 'list' });
     const popular = (tiers || []).find((t) => t.popular)?.min;
     p.tiers.forEach((t) => {
-      tbl.append(el('button', { class: `tier ${t.active ? 'is-active' : ''}`, role: 'listitem', 'data-q': t.min, onclick: () => { set(t.min); renderStep(); } },
-        `<span class="q">${fmtInt(t.min)} pcs${t.min === popular ? ' <span class="pop">le plus choisi</span>' : ''}</span>
-         <span class="u">${t.unit !== null ? fmtMoney(t.unit, p.currency) : '—'} <small>/ u</small></span>
+      tbl.append(el('button', { class: `tier ${t.active ? 'is-active' : ''}`, role: 'listitem', 'data-q': t.min, onclick: () => set(t.min) },
+        `<span class="q">${fmtInt(t.min)} pcs${t.min === popular ? ' <span class="pop">le plus populaire</span>' : ''}</span>
+         <span class="u">${t.unit !== null ? fmtMoney(t.unit, p.currency) : '—'} <small>/ unit</small></span>
          <span class="sv">${t.saving > 0.005 ? `−${Math.round(t.saving * 100)} %` : ''}</span>`));
     });
     pg.append(tbl);
-    if (p.setup) pg.append(el('p', { class: 'note' }, `Frais de calage du marquage inclus et répartis : ${fmtMoney(p.setup, p.currency, 0)} au total.`));
   } else {
     const chips = el('div', { class: 'chips' });
-    (product.quantity.presets || []).forEach((n) => chips.append(el('button', { class: 'chip', 'data-q': n, onclick: () => set(n) }, fmtInt(n))));
+    (product.quantity.presets || []).forEach((n) => chips.append(el('button', { class: `chip ${cfg.quantity === n ? 'is-active' : ''}`, onclick: () => set(n) }, fmtInt(n))));
     pg.append(chips);
-    markPresets = () => chips.querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', Number(c.dataset.q) === cfg.quantity));
-    markPresets();
   }
   body.append(pg);
 
-  body.append(el('p', { class: `note ${p.status === 'factory' ? 'warn' : ''}` },
-    p.status === 'factory'
-      ? (p.belowMoq && p.moq ? `Minimum de commande : ${fmtInt(p.moq)} pièces.` : 'Tarifs non encore renseignés pour cette configuration : votre projet sera chiffré par SKLUBS après validation. Aucun prix n\'est affiché tant qu\'il n\'est pas confirmé.')
-      : p.status === 'estimated' ? 'Prix estimé : confirmé par SKLUBS après validation du fichier.' : ''));
+  // Récapitulatif prix (planche 10)
+  const card = el('div', { class: 'price-card' });
+  if (p.status === 'factory') {
+    card.innerHTML = `<p class="label"><span>Récapitulatif prix</span></p><b class="big">Sur devis</b>
+      <p class="note">${p.belowMoq && p.moq ? `Minimum de commande : ${fmtInt(p.moq)} pièces.` : 'Tarifs non encore renseignés pour cette configuration : SKLUBS chiffre votre projet après validation usine. Aucun prix n\'est affiché tant qu\'il n\'est pas confirmé.'}</p>`;
+  } else {
+    card.innerHTML = `<p class="label"><span>Récapitulatif prix</span></p>
+      <b class="big">${fmtMoney(p.unit, p.currency)}${tax}</b><span class="sub">Prix unitaire (${fmtInt(cfg.quantity)} pcs)</span>
+      <div class="tot"><b>${fmtMoney(p.total, p.currency)}${tax}</b>${p.saving > 0.005 ? `<span class="save">−${Math.round(p.saving * 100)} %</span>` : ''}</div><span class="sub">Total estimé</span>
+      ${p.leadTime ? `<p class="lead">${ICON.clock}<span>Délai de production<br><b>${esc(p.leadTime)}</b></span></p>` : ''}
+      ${p.setup ? `<p class="note">Frais de calage du marquage inclus et répartis : ${fmtMoney(p.setup, p.currency, 0)} au total.</p>` : ''}
+      <p class="note">${p.status === 'estimated' ? 'Prix estimatif, validation usine incluse.' : 'Prix instantané, confirmé à la validation du fichier.'}</p>`;
+  }
+  body.append(card);
   if (product.reference?.quantity) body.append(el('p', { class: 'note' }, `Référence devis Cricket : ${fmtInt(product.reference.quantity)} pièces.`));
 }
 const stepFor = (q) => (q < 100 ? 10 : q < 1000 ? 50 : 250);
 
-// ---------- Récapitulatif ----------
+// ---------- Vue finale & ajout au projet ----------
 function enterReview() {
   $('#app').classList.add('is-review');
+  setExploded(false);
+  setPreviewMode('3d');
+  $('#modeSeg').hidden = true;
+  lastStepShown = -1;
   const size = currentSize();
   const dot = (h) => `<i style="background:${h}"></i>`;
   const ref = (c) => (cfg.colorRefs[c] ? ` · ${esc(cfg.colorRefs[c])}` : '');
+  const cap = size.capacity && !/^TO_DEFINE/.test(size.capacity) ? size.capacity : 'à confirmer';
   const rows = [
-    ['Produit', esc(product.name)],
-    ['Capacité', esc(size.label)],
-    ['Matière', `${esc(labelOf(product.materials, cfg.material))} · ${esc(product.finishes[cfg.finish].label)}`],
-    ['Corps', `${esc(bodyColorShown().toUpperCase())}${ref('body')}${dot(bodyColorShown())}`],
-    ['Bouchon', `${esc(cfg.colors.cap.toUpperCase())}${ref('cap')}${dot(cfg.colors.cap)}`],
-    ['Anse', `${esc(cfg.colors.handle.toUpperCase())}${ref('handle')}${dot(cfg.colors.handle)}`],
-    ['Bague', esc(ringLabel())],
-    ['Marquage', cfg.hasArtwork ? `${esc(methodLabel())} · ${esc(labelOf(product.printZones, cfg.zone))}` : 'Sans marquage'],
-    ['Visuel', cfg.hasArtwork ? `${esc(artwork.name)} · ${fmtLen(artwork.t.width, zoneWidth())}` : '—'],
+    ['Modèle', esc(product.name)],
+    ['Capacité', esc(cap)],
+    ['Matière', esc(labelOf(product.materials, cfg.material))],
+    ['Finition', esc(product.finishes[cfg.finish].label)],
+    ['Couleur corps', `${esc(colorName(bodyColorShown()))}${ref('body')}${dot(bodyColorShown())}`],
+    ['Couleur bouchon', `${esc(colorName(cfg.colors.cap))}${ref('cap')}${dot(cfg.colors.cap)}`],
+    ['Couleur anse', `${esc(colorName(cfg.colors.handle))}${ref('handle')}${dot(cfg.colors.handle)}`],
+    ['Anneau métallique', esc(ringLabel())],
+    ["Méthode d'impression", cfg.hasArtwork ? esc(methodLabel()) : 'Sans marquage'],
+    ["Zone d'impression", cfg.hasArtwork ? esc(labelOf(product.printZones, cfg.zone)) : '—'],
+    ['Éléments', cfg.hasArtwork ? artwork.layers.map((l) => esc(l.kind === 'text' ? `« ${l.textOpts.text.replace(/\n/g, ' ')} »` : l.name)).join(', ') : '—'],
     ['Quantité', `${fmtInt(cfg.quantity)} pcs`],
   ];
   $('#reviewList').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
   const p = computePrice(product, cfg);
+  const tax = product.pricing?.taxLabel ? ` ${product.pricing.taxLabel}` : '';
   $('#reviewPrice').innerHTML = p.status === 'factory'
-    ? `<div class="row"><span class="status factory">${STATUS.factory}</span></div><p>Cette configuration sera chiffrée par SKLUBS. Envoyez le projet : aperçu, visuel et paramètres sont joints.</p>`
-    : `<div class="row"><span>Prix / unité</span><b>${fmtMoney(p.unit, p.currency)}</b></div><div class="row"><span>Total</span><b>${fmtMoney(p.total, p.currency, 0)}</b></div>`
-      + `<p>${STATUS[p.status]}${p.saving > 0.005 ? ` · économie de ${Math.round(p.saving * 100)} % par rapport au premier palier` : ''}${p.leadTime ? ` · délai ${esc(p.leadTime)}` : ''}</p>`;
-  $('#sendBtn').textContent = p.status === 'factory' ? 'Envoyer à SKLUBS' : 'Demander le devis';
+    ? `<div class="row"><span class="status factory">${STATUS.factory}</span></div><p>Cette configuration sera chiffrée par SKLUBS. Demandez le devis : aperçu, visuels et paramètres sont joints.</p>`
+    : `<div class="row"><span>Prix unitaire (${fmtInt(cfg.quantity)} pcs)</span><b>${fmtMoney(p.unit, p.currency)}${tax}</b></div><div class="row"><span>Total estimé</span><b>${fmtMoney(p.total, p.currency)}${tax}</b></div>`
+      + `<p>${STATUS[p.status]}${p.saving > 0.005 ? ` · économie de ${Math.round(p.saving * 100)} %` : ''}${p.leadTime ? ` · délai ${esc(p.leadTime)}` : ''}</p>`;
+  const canOrder = p.status === 'instant';
+  $('#orderBtn').disabled = !canOrder;
+  $('#orderNote').textContent = canOrder ? 'Finalisez votre commande directement en ligne.' : 'Disponible dès que le prix est confirmé.';
   viewer.setGuides(false);
   $('#guidesBtn').setAttribute('aria-pressed', 'false');
+  viewer.setPodium(true);
   if (isMobile()) viewer.setFrameShift(0.24);
   viewer.goTo('hero');
   setTimeout(() => { viewer.setAutoRotate(true); $('#rotateBtn').setAttribute('aria-pressed', 'true'); }, 900);
@@ -658,6 +863,7 @@ function enterReview() {
 function exitReview() {
   if (!$('#app').classList.contains('is-review')) return;
   $('#app').classList.remove('is-review');
+  viewer.setPodium(false);
   viewer.setFrameShift(0);
   viewer.setAutoRotate(false);
   $('#rotateBtn').setAttribute('aria-pressed', 'false');
@@ -665,22 +871,31 @@ function exitReview() {
 }
 
 // ---------- Projet ----------
-function buildProject() {
+function buildProject(intent = 'quote') {
   const size = currentSize();
   const p = computePrice(product, cfg);
+  const S = SCALE();
+  const mm = product.scale.mmPerBodyHeight;
+  const tf = (t) => ({
+    units: 'BODY_HEIGHT', x: +(t.x / S).toFixed(4), y: +(t.y / S).toFixed(4), width: +(t.width / S).toFixed(4),
+    width_pct_zone: Math.round((t.width / zoneWidth()) * 100), rotation_deg: t.rotation,
+    mm: typeof mm === 'number' ? { x: (t.x / S) * mm, y: (t.y / S) * mm, width: (t.width / S) * mm } : 'TO_DEFINE_FACTORY',
+  });
   return {
+    intent, // quote = demande de devis, order = commande, save = ajout au projet
     product_id: product.id,
     variant_id: `${product.id}-${size.id}`,
     size: size.id,
     materials: { material: cfg.material, finish: cfg.finish },
     colors: { body: bodyColorShown(), cap: cfg.colors.cap, handle: cfg.colors.handle, ring: cfg.colors.ring },
     color_refs: cfg.colorRefs,
-    artwork: artwork.image ? { file: artwork.name, data_url: artwork.image.toDataURL('image/png') } : null,
-    artwork_transform: artwork.image ? {
-      units: 'BODY_HEIGHT', x: +(artwork.t.x / SCALE()).toFixed(4), y: +(artwork.t.y / SCALE()).toFixed(4), width: +(artwork.t.width / SCALE()).toFixed(4),
-      width_pct_zone: Math.round((artwork.t.width / zoneWidth()) * 100), rotation_deg: artwork.t.rotation,
-      mm: typeof product.scale.mmPerBodyHeight === 'number' ? { x: (artwork.t.x / SCALE()) * product.scale.mmPerBodyHeight, y: (artwork.t.y / SCALE()) * product.scale.mmPerBodyHeight, width: (artwork.t.width / SCALE()) * product.scale.mmPerBodyHeight } : 'TO_DEFINE_FACTORY',
-    } : null,
+    // visuel de production : déroulé 360° complet (tous les éléments) ; détail de chaque élément ci-dessous
+    artwork: artwork.hasArt ? { file: artwork.layers.map((l) => l.name).join(' + '), data_url: artwork.colorCanvas.toDataURL('image/png') } : null,
+    artwork_layers: artwork.layers.map((l) => ({
+      kind: l.kind, name: l.name, text: l.textOpts || null, transform: tf(l.t),
+      data_url: l.kind === 'image' ? l.image.toDataURL('image/png') : null,
+    })),
+    artwork_transform: artwork.hasArt ? tf(artwork.layers[0].t) : null,
     model: product.master.model,
     printing_method: cfg.hasArtwork ? cfg.method : null,
     print_zones: cfg.hasArtwork ? [cfg.zone] : [],
@@ -714,8 +929,8 @@ function exportProject() {
   return proj;
 }
 
-function sendToParent() {
-  const proj = buildProject();
+function sendToParent(intent = 'quote') {
+  const proj = buildProject(intent);
   window.parent.postMessage({ type: 'sklubs:bottle:project', version: 1, project: proj }, parentOrigin);
   toast('Projet transmis à SKLUBS…');
 }
@@ -726,8 +941,21 @@ window.addEventListener('message', (e) => {
   if (e.data?.type === 'sklubs:bottle:project-error') toast(e.data.message || 'Envoi impossible. Réessayez ou contactez SKLUBS.');
 });
 
-async function sendProject() {
-  if (parentOrigin) { sendToParent(); return; }
+// Ajouter au projet : configuration gardée sur cet appareil (et transmise au site s'il intègre le configurateur)
+function saveProject() {
+  const proj = buildProject('save');
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem('sklubs-projects') || '[]'); } catch { /* stockage indisponible */ }
+  const light = { ...proj, preview_image: viewer.snapshot(360), artwork: proj.artwork ? { file: proj.artwork.file } : null, artwork_layers: proj.artwork_layers.map((l) => ({ ...l, data_url: null })) };
+  list = [light, ...list].slice(0, 12);
+  let saved = false;
+  try { localStorage.setItem('sklubs-projects', JSON.stringify(list)); saved = true; } catch { /* quota ou navigation privée */ }
+  if (parentOrigin) sendToParent('save');
+  else toast(saved ? `Ajouté au projet : ${list.length} configuration${list.length > 1 ? 's' : ''} enregistrée${list.length > 1 ? 's' : ''} sur cet appareil.` : 'Enregistrement impossible sur cet appareil : téléchargez le rendu ou demandez un devis.');
+}
+
+async function sendProject(intent = 'quote') {
+  if (parentOrigin) { sendToParent(intent); return; }
   if (!SUBMIT_ENDPOINT) {
     exportProject();
     if (!window.SKLUBS_PREVIEW) toast('Envoi en ligne à brancher (point d\'envoi SKLUBS à définir). Projet et aperçu téléchargés.');
@@ -736,7 +964,7 @@ async function sendProject() {
   const btn = $('#sendBtn');
   btn.disabled = true;
   try {
-    const res = await fetch(SUBMIT_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildProject()) });
+    const res = await fetch(SUBMIT_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildProject(intent)) });
     if (!res.ok) throw new Error(res.status);
     toast('Projet envoyé à SKLUBS.');
   } catch {
@@ -753,15 +981,38 @@ function bindChrome() {
   $('#nextBtn').addEventListener('click', () => goStep(step + 1));
   $('#ctaBtn').addEventListener('click', () => goStep(STEPS.length - 1));
   $('#editBtn').addEventListener('click', () => goStep(STEPS.length - 2));
-  $('#sendBtn').addEventListener('click', sendProject);
-  $('#downloadBtn').addEventListener('click', () => { exportProject(); if (!window.SKLUBS_PREVIEW) toast('Aperçu PNG et fichier projet téléchargés.'); });
+  $('#sendBtn').addEventListener('click', () => sendProject('quote'));
+  $('#orderBtn').addEventListener('click', () => sendProject('order'));
+  $('#saveBtn').addEventListener('click', saveProject);
+  $('#downloadBtn').addEventListener('click', () => { exportProject(); if (!window.SKLUBS_PREVIEW) toast('Rendu 3D (PNG) et fichier projet téléchargés.'); });
   $('#fileInput').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) handleFile(f); e.target.value = ''; });
 
-  $('#views').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-view]');
+  $('#tools').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-view], button[data-act]');
     if (!b) return;
-    viewer.goTo(b.dataset.view);
+    setPreviewMode('3d');
+    if (b.dataset.view) viewer.goTo(b.dataset.view);
+    if (b.dataset.act === 'zoomin') viewer.zoom(0.8);
+    if (b.dataset.act === 'zoomout') viewer.zoom(1.25);
   });
+  $('#explodeBtn').addEventListener('click', (e) => {
+    const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+    setExploded(on);
+    if (on) viewer.goTo('explode');
+    if (STEPS[step].id === 'cap') renderStep();
+  });
+  $('#fullBtn').addEventListener('click', () => {
+    const v = $('#viewer');
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else (v.requestFullscreen || v.webkitRequestFullscreen)?.call(v);
+  });
+  $('#modeSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mode]');
+    if (!b) return;
+    setPreviewMode(b.dataset.mode);
+    if (STEPS[step].id === 'preview') renderStep();
+  });
+  addEventListener('resize', () => { if (!$('#template').hidden) drawTemplate(); });
   $('#resetBtn').addEventListener('click', () => viewer.goTo('front'));
   $('#rotateBtn').addEventListener('click', (e) => {
     const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
@@ -770,6 +1021,7 @@ function bindChrome() {
   });
   $('#guidesBtn').addEventListener('click', (e) => {
     const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+    userGuides = on;
     e.currentTarget.setAttribute('aria-pressed', String(on));
     viewer.setGuides(on);
   });
