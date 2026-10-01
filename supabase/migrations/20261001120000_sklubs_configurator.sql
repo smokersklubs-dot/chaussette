@@ -287,13 +287,20 @@ grant select on public.categories, public.products, public.price_tiers, public.p
 grant insert, update, delete on public.categories, public.products, public.price_tiers, public.price_options, public.projects to authenticated;
 grant select on public.projects, public.admins to authenticated;
 
--- ---------------------------------------------------------------- fichiers des projets (aperçus, visuels, logos)
+-- ---------------------------------------------------------------- stockage : projets (privé) et catalogue (public)
 do $$
 begin
   if exists (select 1 from pg_namespace where nspname = 'storage') then
     insert into storage.buckets (id, name, public) values ('projects', 'projects', false) on conflict (id) do nothing;
     if not exists (select 1 from pg_policies where schemaname = 'storage' and policyname = 'sklubs_projects_admin_read') then
       create policy sklubs_projects_admin_read on storage.objects for select using (bucket_id = 'projects' and public.is_admin());
+    end if;
+    -- images et modèles 3D du catalogue : lecture publique, envoi par les administrateurs (back-office)
+    insert into storage.buckets (id, name, public) values ('catalog', 'catalog', true) on conflict (id) do nothing;
+    if not exists (select 1 from pg_policies where schemaname = 'storage' and policyname = 'sklubs_catalog_admin_write') then
+      create policy sklubs_catalog_admin_write on storage.objects for insert with check (bucket_id = 'catalog' and public.is_admin());
+      create policy sklubs_catalog_admin_update on storage.objects for update using (bucket_id = 'catalog' and public.is_admin());
+      create policy sklubs_catalog_admin_delete on storage.objects for delete using (bucket_id = 'catalog' and public.is_admin());
     end if;
   end if;
 end $$;

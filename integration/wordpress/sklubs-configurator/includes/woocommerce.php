@@ -42,9 +42,8 @@ function sklubs_cfg_add_to_cart(WP_REST_Request $r) {
     if (!sklubs_cfg_wc_active()) return new WP_Error('no_shop', 'La boutique n\'est pas disponible : demandez un devis.', ['status' => 503]);
     $p = sklubs_cfg_parse_project($r);
     if (is_wp_error($p)) return $p;
-    $post = sklubs_cfg_post($p['product_id']);
-    if (!$post || $post->post_status !== 'publish') return new WP_Error('not_found', 'Produit introuvable.', ['status' => 404]);
-    $product = sklubs_cfg_data($post);
+    $product = sklubs_cfg_product_data($p['product_id']);
+    if (!$product) return new WP_Error('not_found', 'Produit introuvable.', ['status' => 404]);
     $cfg = sklubs_cfg_config_from_project($product, $p);
     if (is_wp_error($cfg)) return $cfg;
     $price = sklubs_cfg_compute_price($product, $cfg);
@@ -52,9 +51,18 @@ function sklubs_cfg_add_to_cart(WP_REST_Request $r) {
         return new WP_Error('quote_only', 'Cette configuration doit être chiffrée par SKLUBS : demandez un devis.', ['status' => 409, 'reasons' => $price['reasons']]);
     }
     $p['intent'] = 'order';
-    $p['pricing_server'] = $price;
-    $saved = sklubs_cfg_store_project($p, false);
-    if (is_wp_error($saved)) return $saved;
+    if (sklubs_cfg_supabase()) {
+        // projet enregistré dans Supabase (prix recalculé là-bas aussi : on garde le plus prudent des deux calculs)
+        $sb = sklubs_cfg_sb_request('/functions/v1/submit', $p, [], 45);
+        if (is_wp_error($sb)) return $sb;
+        if (($sb['price']['status'] ?? '') !== 'instant') return new WP_Error('quote_only', 'Cette configuration doit être chiffrée par SKLUBS : demandez un devis.', ['status' => 409]);
+        $price['unit'] = max((float) $price['unit'], (float) $sb['price']['unit']);
+        $saved = ['id' => 0, 'ref' => (string) $sb['reference'], 'files' => ['apercu' => (string) ($sb['preview_url'] ?? '')], 'intent' => 'order', 'label' => 'Commande', 'qty' => $cfg['quantity']];
+    } else {
+        $p['pricing_server'] = $price;
+        $saved = sklubs_cfg_store_project($p, false);
+        if (is_wp_error($saved)) return $saved;
+    }
 
     if (function_exists('wc_load_cart')) wc_load_cart();
     if (!WC()->cart) return new WP_Error('no_cart', 'Panier indisponible.', ['status' => 503]);
@@ -77,7 +85,7 @@ function sklubs_cfg_add_to_cart(WP_REST_Request $r) {
     }
     WC()->cart->calculate_totals();
     if (WC()->session && method_exists(WC()->session, 'set_customer_session_cookie')) WC()->session->set_customer_session_cookie(true);
-    sklubs_cfg_notify($saved, $p, $price);
+    if (!sklubs_cfg_supabase()) sklubs_cfg_notify($saved, $p, $price);
     return ['ok' => true, 'reference' => $saved['ref'], 'redirect' => wc_get_cart_url(), 'unit' => $price['unit'], 'total' => $price['total']];
 }
 
@@ -105,8 +113,8 @@ add_action('woocommerce_before_calculate_totals', function ($cart) {
         if (empty($item['sklubs'])) { $cart->remove_cart_item($key); continue; }
         $s = $item['sklubs'];
         if ((int) $item['quantity'] !== (int) $s['qty']) {
-            $post = sklubs_cfg_post($s['product']);
-            $price = $post ? sklubs_cfg_compute_price(sklubs_cfg_data($post), array_merge($s['cfg'], ['quantity' => (int) $item['quantity']])) : ['status' => 'factory'];
+            $prod = sklubs_cfg_product_data($s['product']);
+            $price = $prod ? sklubs_cfg_compute_price($prod, array_merge($s['cfg'], ['quantity' => (int) $item['quantity']])) : ['status' => 'factory'];
             if ($price['status'] === 'instant') {
                 $s['unit'] = $price['unit']; $s['qty'] = (int) $item['quantity']; $s['cfg']['quantity'] = (int) $item['quantity'];
             } else {
@@ -146,6 +154,11 @@ $sklubs_link_order = function ($order) {
     if (is_numeric($order)) $order = wc_get_order($order);
     if (!$order) return;
     foreach ($order->get_items() as $line) {
+        $ref = (string) $line->get_meta('Référence configurateur');
+        $sb = sklubs_cfg_supabase();
+        if ($ref && $sb && $sb['secret']) {
+            sklubs_cfg_sb_request('/functions/v1/submit?action=link-order', ['reference' => $ref, 'order_id' => $order->get_id()], ['x-sklubs-secret' => $sb['secret']]);
+        }
         $pid = (int) $line->get_meta('_sklubs_project_id');
         if (!$pid) continue;
         update_post_meta($pid, '_sklubs_order_id', $order->get_id());

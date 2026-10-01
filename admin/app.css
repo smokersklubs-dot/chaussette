@@ -38,3 +38,4 @@
 .sk-toast { position: fixed; right: 24px; bottom: 24px; background: #1d2327; color: #fff; padding: 10px 14px; border-radius: 6px; opacity: 0; transform: translateY(8px); transition: .25s; z-index: 100000; max-width: 420px; }
 .sk-toast.show { opacity: 1; transform: none; }
 .sk-toast.bad { background: #b32d2e; }
+.sk-json-view { background: #f6f7f7; border: 1px solid var(--sk-line); border-radius: 6px; padding: 12px; margin-top: 16px; max-height: 480px; overflow: auto; font-size: 12px; white-space: pre-wrap; }

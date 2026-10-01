@@ -28,14 +28,16 @@ Voir `integration/wordpress/README.md`.
 avec le bon type. `.vercelignore` ne publie que le site et le modèle web (pas les fichiers de travail Blender).
 Ensuite, brancher le site WordPress : voir `integration/wordpress/README.md`.
 
-## Back-office (WordPress)
+## Backend (Supabase) et boutique (WooCommerce)
 
-L'extension `integration/wordpress/sklubs-configurator/` ajoute le menu **Configurateur** dans l'admin WordPress :
-produits, variantes, matières, finitions, couleurs, techniques de marquage, **paliers de prix par quantité**,
-MOQ, délai, catégories de l'accueil, et réception des projets clients.
-Le configurateur lit ces données par l'API `…/wp-json/sklubs/v1` dès que la balise
-`<meta name="sklubs-api">` de `index.html` et `configurateur.html` contient son adresse.
-Vide (ou API injoignable), il lit les fichiers `products/` du dépôt.
+- **Supabase** : base de données principale (produits, prix, catégories, projets clients, fichiers). Voir `supabase/README.md`.
+  Le configurateur lit `rpc/catalog` et `rpc/product`, et envoie les devis à la fonction `submit` (prix recalculé côté serveur).
+- **Back-office** : `admin.html` (connexion Supabase, comptes de la table `admins`) : produits, variantes, matières,
+  couleurs, techniques, **paliers de prix**, MOQ, délai, catégories, projets clients et leur statut.
+- **WordPress / WooCommerce** : l'extension `integration/wordpress/sklubs-configurator/` affiche le configurateur
+  (page `/configurateur-3d/`, code court `[sklubs_configurateur]`) et **« Commander » ajoute la bouteille au panier
+  WooCommerce** au prix serveur, avec tout le détail de la configuration dans la commande.
+- Sans Supabase : API WordPress (`<meta name="sklubs-api">`), puis fichiers `products/` du dépôt.
 
 ## Lancer en local
 
@@ -87,8 +89,10 @@ Mobile : viewer en haut, panneau en bottom sheet (replié, moyen, plein écran).
 | `bottle-master/` | Reconstruction 3D contrainte : scripts Blender, calques de validation, .blend, GLB, rendus |
 | `js/artwork.js` | Composition du visuel, masque de gravure, patron 2D |
 | `js/pricing.js` | Règles de compatibilité et calcul du prix (paliers par variante + suppléments + calage) |
-| `js/data.js` | Lecture du catalogue et des produits : API WordPress, sinon fichiers du dépôt |
-| `integration/wordpress/sklubs-configurator/` | Extension WordPress : back-office, API, projets clients |
+| `js/data.js` | Lecture du catalogue et des produits : Supabase, sinon API WordPress, sinon fichiers du dépôt |
+| `admin.html`, `admin/` | Back-office (Supabase ou WordPress) |
+| `supabase/` | Base de données, sécurité, fonction serveur `submit` |
+| `integration/wordpress/sklubs-configurator/` | Extension WordPress : configurateur inclus, pont WooCommerce, réglages Supabase |
 | `js/main.js` | Étapes, état, récapitulatif, export projet, bottom sheet, envoi au site |
 | `js/home.js`, `home.css` | Accueil : hero, types de produit, modèles, lien vers le configurateur avec la couleur choisie |
 | `js/hero3d.js` | Bouteille 3D de l'accueil (couleurs, logo, animation légère) |

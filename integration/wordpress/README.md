@@ -24,6 +24,18 @@ Pour l'afficher dans une autre page : code court `[sklubs_configurateur]` (accue
 
 Après une mise à jour, vider le cache Cloudflare / de l'extension de cache si l'ancienne version reste affichée.
 
+## Supabase et WooCommerce
+
+- **Supabase** (base principale) : URL et clé anon lues dans le configurateur inclus (balises meta, voir
+  `supabase/README.md`) ou saisies dans **Configurateur → Réglages**. L'onglet **Produits** affiche alors le
+  back-office Supabase (connexion par e-mail). Les devis vont directement dans Supabase.
+- **WooCommerce** : « Commander » (actif seulement si le prix est confirmé) envoie la configuration au site, qui
+  recalcule le prix, enregistre le projet dans Supabase et ajoute au panier un produit support caché
+  « … — personnalisée » (créé automatiquement, non achetable autrement). Le détail (référence, couleurs,
+  marquage, aperçu) suit l'article jusqu'à la commande ; avec le secret partagé (`SKLUBS_SHARED_SECRET`),
+  le projet Supabase passe au statut « Commandé » avec le numéro de commande.
+- Les prix saisis doivent suivre le réglage WooCommerce (prix saisis HT ou TTC).
+
 ## Variante : hébergement séparé (Vercel + bouteille.sklubs.fr)
 
 1. Vercel : importer le dépôt `chaussette` (Framework **Other**), domaine `bouteille.sklubs.fr`.

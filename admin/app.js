@@ -1,4 +1,5 @@
-/* SKLUBS Configurateur — écran d'administration (WordPress). Aucune dépendance. */
+/* SKLUBS Configurateur — back-office (produits, prix, catégories, projets). Aucune dépendance.
+   Serveur : WordPress (API REST + jeton) par défaut, ou Supabase si window.SKLUBS_ADMIN.api est fourni (voir admin/supabase-admin.js). */
 (function () {
   'use strict';
   const A = window.SKLUBS_ADMIN || {};
@@ -6,12 +7,12 @@
   if (!root) return;
 
   /* ---------- outils ---------- */
-  const api = async (path, opts = {}) => {
+  const api = A.api || (async (path, opts = {}) => {
     const r = await fetch(A.root + path, { credentials: 'same-origin', ...opts, headers: { 'X-WP-Nonce': A.nonce, 'Content-Type': 'application/json' } });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.message || `Erreur ${r.status}`);
     return j;
-  };
+  });
   const h = (tag, attrs = {}, ...kids) => {
     const n = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {
@@ -67,6 +68,10 @@
   function mediaInput(path, kind) {
     const input = text(path, { placeholder: kind === 'model' ? 'URL ou chemin du fichier .glb' : 'URL de l\'image' });
     const btn = h('button', { type: 'button', class: 'button', onclick: () => {
+      if (A.media) { // Supabase : envoi dans le stockage public « catalog »
+        A.media(kind).then((url) => { if (!url) return; setP(P(), path, url); input.value = url; markDirty(); }).catch((e) => toast(e.message, true));
+        return;
+      }
       if (!window.wp?.media) { toast('Médiathèque indisponible.', true); return; }
       const f = wp.media({ title: kind === 'model' ? 'Modèle 3D (.glb)' : 'Image', multiple: false, library: kind === 'model' ? {} : { type: 'image' } });
       f.on('select', () => { const a = f.state().get('selection').first().toJSON(); setP(P(), path, a.url); input.value = a.url; markDirty(); });
@@ -136,11 +141,39 @@
       h('button', { class: 'button button-primary', onclick: () => newProduct() }, '+ Nouveau produit'),
       h('button', { class: 'button', onclick: () => fileIn.click() }, 'Importer un JSON'), fileIn,
       h('button', { class: 'button', onclick: viewCategories }, 'Catégories'),
+      A.projects ? h('button', { class: 'button', onclick: viewProjects }, 'Projets clients') : null,
+      A.logout ? h('button', { class: 'button', onclick: A.logout }, 'Déconnexion') : null,
     ], h('div', {},
       S.products.length
         ? h('table', { class: 'widefat striped sk-list' }, h('thead', {}, h('tr', {}, ['Produit', 'Catégorie', 'Variantes', 'Statut', 'Modifié', ''].map((t) => h('th', {}, t)))), h('tbody', {}, rows))
         : h('p', {}, 'Aucun produit. Créez-en un ou importez un fichier product.json.'),
       h('p', { class: 'sk-help' }, 'Un produit « En ligne » apparaît sur l\'accueil des configurateurs et peut être configuré. Les prix vides restent « sur devis » côté client.')));
+  }
+
+  /* ---------- projets clients (Supabase) ---------- */
+  const INTENT = { quote: 'Devis', order: 'Commande', save: 'Projet enregistré' };
+  const PSTATUS = { new: 'Nouveau', in_progress: 'En cours', quoted: 'Devis envoyé', ordered: 'Commandé', done: 'Terminé', cancelled: 'Annulé' };
+  async function viewProjects() {
+    S.view = 'projects';
+    let list = [];
+    try { list = await A.projects.list(); } catch (e) { toast(e.message, true); }
+    const detail = h('pre', { class: 'sk-json-view', hidden: true });
+    const price = (pr) => (pr && pr.unit !== null && pr.unit !== undefined ? `${money(pr.unit, pr.currency)} / u · ${money(pr.total, pr.currency)}${pr.taxLabel ? ` ${pr.taxLabel}` : ''}` : 'Sur devis');
+    const rows = list.map((r) => h('tr', {},
+      h('td', {}, new Date(r.created_at).toLocaleString('fr-FR')),
+      h('td', {}, h('strong', {}, r.reference)),
+      h('td', {}, INTENT[r.intent] || r.intent),
+      h('td', {}, r.product_id || '—'),
+      h('td', {}, String(r.quantity ?? '—')),
+      h('td', {}, price(r.price_server)),
+      h('td', {}, h('select', { onchange: async (e) => { try { await A.projects.setStatus(r.id, e.target.value); toast('Statut mis à jour.'); } catch (err) { toast(err.message, true); } } },
+        Object.entries(PSTATUS).map(([v, l]) => h('option', { value: v, selected: v === r.status ? 'selected' : null }, l)))),
+      h('td', {}, Object.entries(r.files || {}).map(([k, path]) => h('button', { type: 'button', class: 'button-link', onclick: async () => { try { window.open(await A.projects.fileUrl(path), '_blank'); } catch (e) { toast(e.message, true); } } }, k)), r.wc_order_id ? h('div', { class: 'sk-sub' }, `Commande WooCommerce n° ${r.wc_order_id}`) : null),
+      h('td', {}, h('button', { class: 'button', onclick: () => { detail.hidden = false; detail.textContent = JSON.stringify(r.project, null, 2); detail.scrollIntoView({ behavior: 'smooth' }); } }, 'Détail'))));
+    shell('Projets clients', [h('button', { class: 'button', onclick: () => viewList() }, '← Produits'), h('button', { class: 'button', onclick: viewProjects }, 'Actualiser')],
+      h('div', {}, list.length
+        ? h('table', { class: 'widefat striped sk-list' }, h('thead', {}, h('tr', {}, ['Date', 'Référence', 'Demande', 'Produit', 'Qté', 'Prix (serveur)', 'Statut', 'Fichiers', ''].map((t) => h('th', {}, t)))), h('tbody', {}, rows))
+        : h('p', {}, 'Aucun projet pour le moment.'), detail));
   }
 
   function viewCategories() {

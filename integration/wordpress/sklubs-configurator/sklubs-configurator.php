@@ -100,6 +100,52 @@ add_action('admin_init', 'sklubs_cfg_seed');
 register_activation_hook(__FILE__, 'sklubs_cfg_create_page');
 add_action('admin_init', 'sklubs_cfg_create_page');
 
+/* ---------- Supabase (base de données principale) ---------- */
+
+// URL + clé anon : réglages, sinon balises meta du configurateur inclus (site/index.html)
+function sklubs_cfg_supabase() {
+    static $cfg = null;
+    if ($cfg !== null) return $cfg;
+    $url = trim((string) get_option('sklubs_cfg_sb_url', ''));
+    $key = trim((string) get_option('sklubs_cfg_sb_key', ''));
+    if ((!$url || !$key) && is_readable(SKLUBS_CFG_DIR . '/site/index.html')) {
+        $html = (string) file_get_contents(SKLUBS_CFG_DIR . '/site/index.html');
+        if (!$url && preg_match('/<meta name="sklubs-supabase" content="([^"]+)"/', $html, $m)) $url = $m[1];
+        if (!$key && preg_match('/<meta name="sklubs-supabase-key" content="([^"]+)"/', $html, $m)) $key = $m[1];
+    }
+    $cfg = ($url && $key) ? ['url' => untrailingslashit($url), 'key' => $key, 'secret' => (string) get_option('sklubs_cfg_sb_secret', '')] : [];
+    return $cfg;
+}
+
+function sklubs_cfg_sb_request($path, array $body, array $extra_headers = [], $timeout = 20) {
+    $sb = sklubs_cfg_supabase();
+    if (!$sb) return new WP_Error('no_supabase', 'Supabase non configuré.');
+    $r = wp_remote_post($sb['url'] . $path, ['timeout' => $timeout, 'headers' => array_merge([
+        'apikey' => $sb['key'], 'Authorization' => 'Bearer ' . $sb['key'], 'Content-Type' => 'application/json',
+        'Origin' => untrailingslashit(home_url()),
+    ], $extra_headers), 'body' => wp_json_encode($body)]);
+    if (is_wp_error($r)) return $r;
+    $code = wp_remote_retrieve_response_code($r);
+    $json = json_decode(wp_remote_retrieve_body($r), true);
+    if ($code >= 300) return new WP_Error('supabase', is_array($json) ? ($json['message'] ?? 'Erreur Supabase') : 'Erreur Supabase', ['status' => $code >= 500 ? 502 : $code]);
+    return $json;
+}
+
+// Fiche produit (format du configurateur) : Supabase si configuré (cache 60 s), sinon WordPress
+function sklubs_cfg_product_data($id) {
+    $id = sanitize_title($id);
+    if (sklubs_cfg_supabase()) {
+        $cached = get_transient('sklubs_cfg_p_' . $id);
+        if (is_array($cached)) return $cached;
+        $p = sklubs_cfg_sb_request('/rest/v1/rpc/product', ['p_id' => $id]);
+        if (is_wp_error($p) || !is_array($p) || ($p['status'] ?? '') !== 'publish') return null;
+        set_transient('sklubs_cfg_p_' . $id, $p, 60);
+        return $p;
+    }
+    $post = sklubs_cfg_post($id);
+    return ($post && $post->post_status === 'publish') ? sklubs_cfg_data($post) : null;
+}
+
 /* ---------- Configurateur 3D inclus (dossier site/) ---------- */
 
 // Adresse du configurateur : réglage (ex. hébergement Vercel) sinon la copie incluse dans l'extension
@@ -275,6 +321,10 @@ function sklubs_cfg_receive_project(WP_REST_Request $r) {
     $p = sklubs_cfg_parse_project($r);
     if (is_wp_error($p)) return $p;
     if (($p['intent'] ?? '') === 'order') $p['intent'] = 'quote'; // une commande passe par /cart (prix serveur)
+    if (sklubs_cfg_supabase()) { // base Supabase : le projet y est enregistré (prix serveur, fichiers)
+        $sb = sklubs_cfg_sb_request('/functions/v1/submit', $p, [], 45);
+        return is_wp_error($sb) ? $sb : ['ok' => true, 'reference' => $sb['reference']];
+    }
     // prix recalculé sur le serveur, joint au projet (celui du navigateur reste à titre indicatif)
     $post = sklubs_cfg_post($p['product_id']);
     $price = null;
@@ -381,24 +431,34 @@ add_action('admin_menu', function () {
 });
 
 function sklubs_cfg_admin_page() {
+    if (sklubs_cfg_supabase() && file_exists(SKLUBS_CFG_DIR . '/site/admin.html')) {
+        // données dans Supabase : back-office Supabase (connexion par e-mail, comptes de la table admins)
+        printf('<div class="wrap"><h1 style="margin-bottom:10px">Configurateur — back-office</h1><p>Produits, prix et projets sont enregistrés dans Supabase. <a href="%1$s" target="_blank">Ouvrir dans un onglet</a></p><iframe src="%1$s" style="width:100%%;height:calc(100vh - 170px);min-height:640px;border:1px solid #dcdcde;border-radius:8px;background:#F6F6F4"></iframe></div>',
+            esc_url(SKLUBS_CFG_URL . 'site/admin.html?v=' . SKLUBS_CFG_VERSION));
+        return;
+    }
     echo '<div class="wrap sklubs-wrap"><div id="sklubs-admin">Chargement…</div></div>';
 }
 
 add_action('admin_enqueue_scripts', function ($hook) {
     if ($hook !== 'toplevel_page_sklubs-configurator') return;
     wp_enqueue_media();
-    wp_enqueue_style('sklubs-admin', SKLUBS_CFG_URL . 'admin/app.css', [], SKLUBS_CFG_VERSION);
-    wp_enqueue_script('sklubs-admin', SKLUBS_CFG_URL . 'admin/app.js', [], SKLUBS_CFG_VERSION, true);
+    if (sklubs_cfg_supabase()) return; // back-office Supabase (site/admin.html) affiché dans la page
+    wp_enqueue_style('sklubs-admin', SKLUBS_CFG_URL . 'site/admin/app.css', [], SKLUBS_CFG_VERSION);
+    wp_enqueue_script('sklubs-admin', SKLUBS_CFG_URL . 'site/admin/app.js', [], SKLUBS_CFG_VERSION, true);
     wp_localize_script('sklubs-admin', 'SKLUBS_ADMIN', [
         'root' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/')), 'nonce' => wp_create_nonce('wp_rest'),
         'configuratorUrl' => (string) sklubs_cfg_app_url(),
-        'template' => json_decode((string) @file_get_contents(SKLUBS_CFG_DIR . '/seed/template.json'), true),
+        'template' => json_decode((string) @file_get_contents(SKLUBS_CFG_DIR . '/site/admin/template.json'), true),
     ]);
 });
 
 function sklubs_cfg_settings_page() {
     if (isset($_POST['sklubs_cfg_url']) && check_admin_referer('sklubs_cfg_settings')) {
         update_option('sklubs_cfg_configurator_url', esc_url_raw(wp_unslash($_POST['sklubs_cfg_url'])), false);
+        update_option('sklubs_cfg_sb_url', esc_url_raw(wp_unslash($_POST['sklubs_cfg_sb_url'] ?? '')), false);
+        update_option('sklubs_cfg_sb_key', sanitize_text_field(wp_unslash($_POST['sklubs_cfg_sb_key'] ?? '')), false);
+        update_option('sklubs_cfg_sb_secret', sanitize_text_field(wp_unslash($_POST['sklubs_cfg_sb_secret'] ?? '')), false);
         echo '<div class="notice notice-success"><p>Réglages enregistrés.</p></div>';
     }
     $url = get_option('sklubs_cfg_configurator_url', '');
@@ -412,6 +472,12 @@ function sklubs_cfg_settings_page() {
           <p class="description">Laisser vide pour utiliser le configurateur inclus (<code><?php echo esc_html(SKLUBS_CFG_URL . 'site/'); ?></code>). Renseigner seulement si le configurateur est hébergé ailleurs (ex. https://bouteille.sklubs.fr/).</p></td></tr>
           <tr><th>Page du site</th><td><?php echo $page && get_post_status($page) ? '<a href="' . esc_url(get_permalink($page)) . '" target="_blank">' . esc_html(get_permalink($page)) . '</a>' : '—'; ?>
           <p class="description">Code court pour une autre page : <code>[sklubs_configurateur]</code> (accueil, tous les produits) ou <code>[sklubs_configurateur produit="cricket-bottle"]</code>.</p></td></tr>
+          <?php $sb = sklubs_cfg_supabase(); ?>
+          <tr><th><label for="sklubs_cfg_sb_url">Supabase</label></th><td>
+            <input type="url" class="regular-text" id="sklubs_cfg_sb_url" name="sklubs_cfg_sb_url" value="<?php echo esc_attr(get_option('sklubs_cfg_sb_url', '')); ?>" placeholder="<?php echo esc_attr($sb['url'] ?? 'https://xxxx.supabase.co'); ?>"><br>
+            <input type="text" class="regular-text" name="sklubs_cfg_sb_key" value="<?php echo esc_attr(get_option('sklubs_cfg_sb_key', '')); ?>" placeholder="clé anon (publique)" style="margin-top:6px"><br>
+            <input type="password" class="regular-text" name="sklubs_cfg_sb_secret" value="<?php echo esc_attr(get_option('sklubs_cfg_sb_secret', '')); ?>" placeholder="secret partagé SKLUBS_SHARED_SECRET (optionnel)" style="margin-top:6px" autocomplete="off">
+            <p class="description"><?php echo $sb ? 'Connecté à <code>' . esc_html($sb['url']) . '</code> : produits, prix et projets viennent de Supabase.' : 'Non configuré : les produits sont gérés dans WordPress.'; ?> Vides = valeurs du configurateur inclus. Le secret relie les commandes WooCommerce aux projets.</p></td></tr>
           <tr><th>Adresse de l'API</th><td><code><?php echo esc_html($api); ?></code>
           <p class="description">À indiquer dans le configurateur (balise <code>&lt;meta name="sklubs-api"&gt;</code> de index.html et configurateur.html).</p></td></tr>
         </table><?php submit_button(); ?></form></div>

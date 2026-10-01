@@ -1,0 +1,30 @@
+/* Back-office hors WordPress (admin.html) : reprend les classes de l'admin WordPress dans la DA SKLUBS */
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body.sk-standalone { margin: 0; background: #F6F6F4; color: #111; font: 14px/1.45 "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif; }
+.sk-top { display: flex; align-items: center; gap: 14px; padding: 14px clamp(16px, 4vw, 40px); background: #fff; border-bottom: 1px solid #E4E4E0; }
+.sk-top b { letter-spacing: .14em; font-weight: 800; }
+.sk-top span { color: #8A8A85; font-size: 13px; }
+.sk-top .who { margin-left: auto; font-size: 12.5px; }
+.sklubs-wrap { margin: 0 auto; padding: 8px clamp(16px, 4vw, 40px) 60px; }
+.button { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border: 1px solid #CFCFCA; border-radius: 8px; background: #fff; color: #111; font: inherit; font-size: 13px; cursor: pointer; text-decoration: none; }
+.button:hover { border-color: #111; }
+.button-primary { background: #FF6B00; border-color: #FF6B00; color: #fff; }
+.button-primary:hover { background: #F06200; border-color: #F06200; }
+.button:disabled { opacity: .45; cursor: default; }
+.button-link { border: 0; background: none; color: #FF6B00; cursor: pointer; padding: 0 6px 0 0; font: inherit; text-decoration: underline; }
+input[type=text], input[type=number], input[type=email], input[type=password], input[type=url], select, textarea { height: 34px; padding: 0 10px; border: 1px solid #CFCFCA; border-radius: 8px; background: #fff; font: inherit; font-size: 13px; color: #111; }
+textarea { height: auto; padding: 8px 10px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid #FF6B00; outline-offset: 0; border-color: #FF6B00; }
+.widefat { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #E4E4E0; border-radius: 10px; overflow: hidden; }
+.widefat th { text-align: left; font-size: 12px; color: #8A8A85; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid #E4E4E0; }
+.widefat td { padding: 10px 12px; border-bottom: 1px solid #F0F0ED; vertical-align: middle; }
+.striped tbody tr:nth-child(odd) { background: #FBFBFA; }
+#sklubs-admin { --sk-line: #E4E4E0; --sk-muted: #8A8A85; }
+.sk-card { border-radius: 12px; }
+.sk-login { max-width: 380px; margin: 10vh auto; background: #fff; border: 1px solid #E4E4E0; border-radius: 16px; padding: 28px; display: grid; gap: 12px; }
+.sk-login h1 { margin: 0 0 4px; font-size: 22px; }
+.sk-login p { margin: 0; color: #8A8A85; font-size: 13px; }
+.sk-login input { width: 100%; height: 40px; }
+.sk-login .button { height: 42px; justify-content: center; }
+.sk-login .err { color: #b32d2e; }
