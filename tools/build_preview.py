@@ -30,7 +30,7 @@ imports = sorted(set(re.findall(r"^import [^;]*from 'three[^']*';$", js, flags=r
 js = re.sub(r"^import [^;]*from 'three[^']*';\n", '', js, flags=re.M)
 js = '\n'.join(imports) + '\n' + js
 
-h = open(os.path.join(ROOT, 'index.html')).read(); css = open(os.path.join(ROOT, 'styles.css')).read()
+h = open(os.path.join(ROOT, 'configurateur.html')).read(); css = open(os.path.join(ROOT, 'styles.css')).read()
 css = css.replace('height: 100dvh; }', 'height: 100%; }')
 head = re.search(r'<head>(.*)</head>', h, re.S).group(1); body = re.search(r'<body>(.*)</body>', h, re.S).group(1)
 head = re.sub(r'\s*<meta[^>]*>', '', head)

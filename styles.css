@@ -44,7 +44,10 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
   padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--bg);
 }
 .brand { display: flex; align-items: baseline; gap: 16px; white-space: nowrap; }
-.wordmark { font-weight: 700; letter-spacing: .18em; font-size: 15px; }
+.wordmark { font-weight: 700; letter-spacing: .18em; font-size: 15px; color: inherit; text-decoration: none; }
+.crumb a { color: inherit; text-decoration: none; }
+.crumb a:hover { color: var(--ink); }
+@view-transition { navigation: auto; }
 .crumb { color: var(--muted); font-size: 13px; }
 .crumb i { font-style: normal; margin: 0 4px; color: var(--line-strong); }
 .crumb b { color: var(--ink); font-weight: 500; }

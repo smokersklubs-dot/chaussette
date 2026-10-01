@@ -25,7 +25,9 @@ le jeton expire au bout de 12 à 24 heures.
 ## 3. Créer la page
 
 Dans une page WordPress, ajouter un bloc **HTML personnalisé** et y coller `sklubs-bottle-embed.html`,
-en remplaçant `CONFIGURATOR_URL` par l'adresse de l'étape 1.
+en remplaçant `CONFIGURATOR_URL` par l'adresse du configurateur, par exemple
+`https://bouteille.sklubs.fr/configurateur?produit=cricket-bottle`. L'accueil (`/`) liste tous les produits
+et peut aussi être intégré tel quel.
 
 ## Sécurité
 

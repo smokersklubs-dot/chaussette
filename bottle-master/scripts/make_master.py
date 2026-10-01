@@ -167,16 +167,29 @@ def shoot(camname, fname, res=(1200, 1600), frame=1):
     s.camera = bpy.data.objects[camname]; s.frame_set(frame); rset(res)
     s.render.filepath = os.path.join(REN, fname); bpy.ops.render.render(write_still=True)
 
-ONLY = next((a.split('=')[1] for a in sys.argv if a.startswith('--only=')), None)
-if ONLY == 'handle_down':
+ONLY_SET = set(next((a.split('=')[1] for a in sys.argv if a.startswith('--only=')), '').split(','))
+ONLY = None
+if 'handle_down' in ONLY_SET:
     shoot('CAM_3Q_RIGHT', 'handle_down.png', frame=24)
-if ONLY == 'lineup':
+if 'lineup' in ONLY_SET:
     lineup.hide_render = False
     for ob in objs.values(): ob.hide_render = True
     lc = cam('CAM_LINEUP', (0, -9.5, 0.85), (0, 0, 0.68), 60); s.camera = lc; rset((1800, 1000)); s.render.filepath = os.path.join(REN, 'color_variants.png'); bpy.ops.render.render(write_still=True)
     lineup.hide_render = True
     for ob in objs.values(): ob.hide_render = False
     bpy.data.objects.remove(lc)
+if 'thumb' in ONLY_SET:
+    # vignette d'accueil : vue de face, fond transparent, recadrée sur la bouteille
+    s.camera = bpy.data.objects['CAM_3Q_RIGHT']; s.frame_set(1); rset((900, 1200))
+    floor.hide_render = True; s.render.film_transparent = True
+    tmp = os.path.join(REN, '_thumb.png'); s.render.filepath = tmp; bpy.ops.render.render(write_still=True)
+    floor.hide_render = False; s.render.film_transparent = False
+    from PIL import Image as _I
+    im = _I.open(tmp).convert('RGBA'); bb = im.getchannel('A').point(lambda v: 255 if v > 8 else 0).getbbox()
+    im = im.crop((max(bb[0] - 12, 0), max(bb[1] - 12, 0), min(bb[2] + 12, im.width), min(bb[3] + 12, im.height)))
+    im.thumbnail((520, 760), _I.LANCZOS)
+    out = os.path.join(ROOT, '..', 'products', 'cricket-bottle', 'thumbnail.webp')
+    im.save(out, 'WEBP', quality=88); os.remove(tmp); print('THUMB', im.size)
 if '--test' in sys.argv:
     shoot('CAM_REFERENCE', 'test_ref.png', res=(450, 600)); shoot('CAM_DETAIL_CAP', 'test_cap.png', res=(450, 600)); sys.exit(0)
 if '--render' in sys.argv:

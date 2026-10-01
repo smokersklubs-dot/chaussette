@@ -2,7 +2,8 @@ import { BottleViewer } from './viewer.js';
 import { ArtworkEngine } from './artwork.js';
 import { allowedFinishes, allowedMethods, allowedZones, computePrice, sanitize } from './pricing.js';
 
-const PRODUCT_URL = 'products/cricket-bottle/product.json';
+const PRODUCT_ID = (new URLSearchParams(location.search).get('produit') || 'cricket-bottle').replace(/[^a-z0-9-]/gi, '');
+const PRODUCT_URL = `products/${PRODUCT_ID}/product.json`;
 // Point d'envoi direct (API) : optionnel. Sur le site, l'envoi passe par la page parente (voir integration/wordpress).
 const SUBMIT_ENDPOINT = null;
 // Pages autorisées à intégrer le configurateur et à recevoir les projets (postMessage)
@@ -73,6 +74,7 @@ async function init() {
   $('#productTag').textContent = product.subtitle;
   $('#reviewTitle').textContent = product.name;
 
+  $('#viewer').style.viewTransitionName = `product-${PRODUCT_ID}`;
   viewer = new BottleViewer($('#viewer'));
   $('#handleBtn').addEventListener('click', (e) => {
     const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';

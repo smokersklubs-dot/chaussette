@@ -1,0 +1,23 @@
+{
+  "_note": "Catalogue des configurateurs. Ajouter un modèle : créer products/<id>/product.json (+ thumbnail.webp et son master 3D), puis l'ajouter ici. Une catégorie sans modèle s'affiche « Bientôt ».",
+  "categories": [
+    { "id": "bottles", "label": "Bouteilles", "desc": "Gourdes isothermes et sport" },
+    { "id": "tumblers", "label": "Tumblers", "desc": "Mugs de voyage isothermes" },
+    { "id": "mugs", "label": "Mugs", "desc": "Céramique et émaillé" },
+    { "id": "thermos", "label": "Thermos", "desc": "Haute performance" },
+    { "id": "cups", "label": "Gobelets", "desc": "Réutilisables, événements" }
+  ],
+  "models": [
+    {
+      "id": "cricket-bottle",
+      "category": "bottles",
+      "name": "Bouteille isotherme",
+      "subtitle": "Inox double paroi · anse sangle · bague inox",
+      "capacity": "à confirmer",
+      "material": "Inox double paroi",
+      "thumbnail": "products/cricket-bottle/thumbnail.webp",
+      "tags": ["Gravure laser", "UV", "Wrap 360°"],
+      "status": "available"
+    }
+  ]
+}

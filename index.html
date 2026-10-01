@@ -3,112 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>SKLUBS — Configurateur Bouteille 3D</title>
-  <link rel="modulepreload" href="js/viewer.js">
-  <link rel="preload" href="bottle-master/export/SKLUBS_BOTTLE_WEB.glb" as="fetch" crossorigin>
-  <meta name="description" content="Configurez votre bouteille personnalisée en 3D : capacité, matière, couleurs, marquage et quantité.">
+  <title>SKLUBS — Configurateurs drinkware</title>
+  <meta name="description" content="Choisissez un produit et personnalisez-le en 3D : bouteilles, tumblers, mugs, thermos, gobelets.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
-  <script type="importmap">
-    { "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-    } }
-  </script>
+  <link rel="stylesheet" href="home.css">
 </head>
 <body>
-  <div class="app" id="app">
-    <header class="topbar">
-      <div class="brand">
-        <span class="wordmark">SKLUBS</span>
-        <span class="crumb">Drinkware <i>/</i> <b id="productName">Bouteille</b></span>
-      </div>
-      <ol class="progress" id="progress" aria-label="Étapes"></ol>
-      <span class="tag" id="productTag"></span>
-    </header>
-
-    <main class="stage">
-      <section class="viewer" id="viewer" aria-label="Aperçu 3D">
-        <div class="viewer-loading" id="loading"><span></span>Chargement du studio 3D</div>
-        <div class="viewer-hud top">
-          <div class="spec" id="specLine"></div>
-          <div class="hud-actions">
-            <button class="icon-btn" id="handleBtn" title="Rabattre l'anse" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3" /><rect x="5" y="11" width="14" height="4" rx="1.5" /><path d="M8 15v5h8v-5" /></svg>
-            </button>
-            <button class="icon-btn" id="guidesBtn" title="Afficher la zone d'impression" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /><path d="M12 9v6M9 12h6" /></svg>
-            </button>
-            <button class="icon-btn" id="rotateBtn" title="Rotation automatique" aria-pressed="false">
-              <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66" /><path d="M20 4v5h-5" /></svg>
-            </button>
-            <button class="icon-btn" id="resetBtn" title="Recentrer la vue">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></svg>
-            </button>
-          </div>
-        </div>
-        <div class="viewer-hud bottom">
-          <div class="views" id="views" role="group" aria-label="Vues">
-            <button data-view="front" class="is-active">Face</button>
-            <button data-view="back">Dos</button>
-            <button data-view="side">Profil</button>
-            <button data-view="top">Dessus</button>
-            <button data-view="detail">Détail</button>
-          </div>
-          <p class="hint" id="hint">Glisser pour tourner · Molette pour zoomer</p>
-        </div>
-
-        <aside class="review-card" id="reviewCard" aria-live="polite">
-          <p class="eyebrow">Votre configuration</p>
-          <h2 id="reviewTitle">Bouteille</h2>
-          <dl id="reviewList"></dl>
-          <div class="review-price" id="reviewPrice"></div>
-          <div class="review-actions">
-            <button class="btn ghost" id="editBtn">Modifier</button>
-            <button class="btn primary" id="sendBtn">Envoyer le projet</button>
-          </div>
-          <button class="link-btn" id="downloadBtn">Télécharger l'aperçu PNG + fichier projet</button>
-        </aside>
-      </section>
-
-      <section class="panel" id="panel" aria-label="Configuration">
-        <div class="sheet-handle" id="sheetHandle" aria-hidden="true"><span></span></div>
-        <div class="panel-head">
-          <p class="step-index" id="stepIndex">01 / 06</p>
-          <h1 class="step-title" id="stepTitle">Capacité</h1>
-          <p class="step-sub" id="stepSub"></p>
-        </div>
-        <div class="panel-body" id="panelBody"></div>
-        <div class="panel-nav">
-          <button class="btn ghost" id="prevBtn">Retour</button>
-          <button class="btn dark" id="nextBtn">Continuer</button>
-        </div>
-      </section>
-    </main>
-
-    <footer class="summary" id="summary">
-      <div class="sum-items" id="sumItems"></div>
-      <div class="sum-price">
-        <div class="price-block"><span class="lbl">Prix / unité</span><span class="val" id="unitPrice">—</span></div>
-        <div class="price-block"><span class="lbl">Total</span><span class="val" id="totalPrice">—</span></div>
-        <span class="status" id="priceStatus"></span>
-      </div>
-      <button class="btn primary cta" id="ctaBtn">Voir le récapitulatif</button>
-    </footer>
-  </div>
-
-  <div class="toast" id="toast" role="status"></div>
-  <input type="file" id="fileInput" accept="image/png,image/jpeg,image/svg+xml" hidden>
-
-  <script type="module" src="js/main.js"></script>
-  <script>
-    // Si le moteur 3D ne se charge pas (réseau / CDN), on le dit au lieu de rester bloqué.
-    setTimeout(function () {
-      var l = document.getElementById('loading');
-      if (l && !l.classList.contains('hidden')) l.innerHTML = '<b style="color:#111">Le studio 3D ne répond pas.</b><small>Vérifiez la connexion puis rechargez la page.</small>';
-    }, 15000);
-  </script>
+  <header class="h-top">
+    <a class="wordmark" href="./">SKLUBS</a>
+    <span class="crumb">Drinkware</span>
+  </header>
+  <main class="h-main">
+    <section class="h-hero">
+      <p class="eyebrow">Configurateur drinkware</p>
+      <h1>Qu'est-ce qu'on fabrique&nbsp;?</h1>
+      <p class="lede">Choisissez un produit. Vous le personnalisez ensuite en 3D : matière, couleurs, marquage, quantité.</p>
+    </section>
+    <nav class="h-cats" id="cats" aria-label="Catégories"></nav>
+    <section class="h-grid" id="grid" aria-live="polite"></section>
+    <p class="h-empty" id="empty" hidden></p>
+    <section id="soon" aria-label="Produits à venir"></section>
+  </main>
+  <footer class="h-foot">
+    <span>Rendus 3D issus de masters reconstruits sur photo produit.</span>
+    <span>Prix et délais confirmés par SKLUBS après validation usine.</span>
+  </footer>
+  <script type="module" src="js/home.js"></script>
 </body>
 </html>

@@ -29,6 +29,15 @@ npx http-server -p 8080 .
 
 Un serveur HTTP est nécessaire (le produit est chargé depuis un fichier JSON).
 
+## Pages
+
+- `index.html` : accueil, liste des produits par catégorie, lue depuis `products/catalog.json`.
+- `configurateur.html?produit=<id>` : configurateur 3D du produit `products/<id>/product.json`.
+
+**Ajouter un modèle** : créer `products/<id>/product.json` (même structure que `cricket-bottle`), sa vignette
+`thumbnail.webp` et son master 3D, puis l'ajouter dans `products/catalog.json`. Une catégorie sans modèle
+s'affiche « Bientôt ».
+
 ## Parcours
 
 1. **Capacité** : un seul format, celui du master. Capacité et cotes : à confirmer usine.
@@ -53,7 +62,9 @@ Mobile : viewer en haut, panneau en bottom sheet (replié, moyen, plein écran).
 | `bottle-master/` | Reconstruction 3D contrainte : scripts Blender, calques de validation, .blend, GLB, rendus |
 | `js/artwork.js` | Composition du visuel, masque de gravure, patron 2D |
 | `js/pricing.js` | Règles de compatibilité et calcul du prix |
-| `js/main.js` | Étapes, état, récapitulatif, export projet, bottom sheet |
+| `js/main.js` | Étapes, état, récapitulatif, export projet, bottom sheet, envoi au site |
+| `js/home.js`, `home.css` | Accueil : catalogue, filtres par catégorie, transition vers le configurateur |
+| `products/catalog.json` | Catégories et modèles affichés à l'accueil |
 
 ## Données à fournir (TO_DEFINE)
 
