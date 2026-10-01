@@ -1,7 +1,7 @@
 import { BottleViewer } from './viewer.js';
 import { API, SHOP, SUBMIT_URL, supabaseHeaders, loadProduct, detectParentOrigin } from './data.js';
 import { ArtworkEngine } from './artwork.js';
-import { allowedFinishes, allowedMethods, allowedZones, computePrice, sanitize } from './pricing.js';
+import { allowedFinishes, allowedMethods, allowedZones, computePrice, printColorRange, sanitize } from './pricing.js';
 
 // ?produit=<id> ; couleurs de départ choisies sur l'accueil : &couleur=, &bouchon=, &anse= (HEX sans #)
 // La page d'aperçu (une seule page) fournit ces paramètres dans window.SKLUBS_PREVIEW_PARAMS.
@@ -81,6 +81,7 @@ async function init() {
     zone: 'front',
     quantity: product.quantity.default,
     hasArtwork: false,
+    printColors: 1,
   };
   sanitize(product, cfg);
 
@@ -657,6 +658,16 @@ function stepMethod(body) {
   });
   body.append(grid);
 
+  const range = printColorRange(product, cfg.method);
+  if (range) {
+    const cg = group('Nombre de couleurs du logo', '<b>une couleur = un écran</b>');
+    const chips = el('div', { class: 'chips' });
+    for (let n = range.min; n <= range.max; n++) {
+      chips.append(el('button', { class: `chip ${cfg.printColors === n ? 'is-active' : ''}`, onclick: () => { cfg.printColors = n; update({ materials: false }); renderStep(); } }, String(n)));
+    }
+    cg.append(chips, el('p', { class: 'note' }, 'Chaque couleur supplémentaire ajoute un prix par pièce et ses propres frais de calage.'));
+    body.append(cg);
+  }
   const m = product.printingMethods.find((x) => x.id === cfg.method);
   if (m) {
     const zones = allowedZones(product, m.id).map((z) => z.label).join(' · ');
@@ -802,13 +813,13 @@ function stepQuantity(body) {
   const card = el('div', { class: 'price-card' });
   if (p.status === 'factory') {
     card.innerHTML = `<p class="label"><span>Récapitulatif prix</span></p><b class="big">Sur devis</b>
-      <p class="note">${p.belowMoq && p.moq ? `Minimum de commande : ${fmtInt(p.moq)} pièces.` : 'Tarifs non encore renseignés pour cette configuration : SKLUBS chiffre votre projet après validation usine. Aucun prix n\'est affiché tant qu\'il n\'est pas confirmé.'}</p>`;
+      <p class="note">${p.belowMoq && p.moq ? `Minimum de commande pour cette configuration : ${fmtInt(p.moq)} pièces.` : 'Tarifs non encore renseignés pour cette configuration : SKLUBS chiffre votre projet après validation usine. Aucun prix n\'est affiché tant qu\'il n\'est pas confirmé.'}</p>`;
   } else {
     card.innerHTML = `<p class="label"><span>Récapitulatif prix</span></p>
       <b class="big">${fmtMoney(p.unit, p.currency)}${tax}</b><span class="sub">Prix unitaire (${fmtInt(cfg.quantity)} pcs)</span>
       <div class="tot"><b>${fmtMoney(p.total, p.currency)}${tax}</b>${p.saving > 0.005 ? `<span class="save">−${Math.round(p.saving * 100)} %</span>` : ''}</div><span class="sub">Total estimé</span>
       ${p.leadTime ? `<p class="lead">${ICON.clock}<span>Délai de production<br><b>${esc(p.leadTime)}</b></span></p>` : ''}
-      ${p.setup ? `<p class="note">Frais de calage du marquage inclus et répartis : ${fmtMoney(p.setup, p.currency, 0)} au total.</p>` : ''}
+      ${p.lines?.length ? `<details class="price-lines"><summary>Détail du prix par pièce</summary><ul>${p.lines.map((l) => `<li><span>${esc(l.label)}</span><b>${fmtMoney(l.unit, p.currency, 3)}</b></li>`).join('')}</ul>${p.setup ? `<p class="note">Frais de calage : ${fmtMoney(p.setup, p.currency, 0)} au total, répartis sur ${fmtInt(cfg.quantity)} pièces.</p>` : ''}</details>` : ''}
       <p class="note">${p.status === 'estimated' ? 'Prix estimatif, validation usine incluse.' : 'Prix instantané, confirmé à la validation du fichier.'}</p>`;
   }
   body.append(card);
@@ -836,7 +847,7 @@ function enterReview() {
     ['Couleur bouchon', `${esc(colorName(cfg.colors.cap))}${ref('cap')}${dot(cfg.colors.cap)}`],
     ['Couleur anse', `${esc(colorName(cfg.colors.handle))}${ref('handle')}${dot(cfg.colors.handle)}`],
     ['Anneau métallique', esc(ringLabel())],
-    ["Méthode d'impression", cfg.hasArtwork ? esc(methodLabel()) : 'Sans marquage'],
+    ["Méthode d'impression", cfg.hasArtwork ? esc(methodLabel()) + (printColorRange(product, cfg.method) ? ` · ${cfg.printColors} couleur${cfg.printColors > 1 ? 's' : ''}` : '') : 'Sans marquage'],
     ["Zone d'impression", cfg.hasArtwork ? esc(labelOf(product.printZones, cfg.zone)) : '—'],
     ['Éléments', cfg.hasArtwork ? artwork.layers.map((l) => esc(l.kind === 'text' ? `« ${l.textOpts.text.replace(/\n/g, ' ')} »` : l.name)).join(', ') : '—'],
     ['Quantité', `${fmtInt(cfg.quantity)} pcs`],
@@ -897,6 +908,7 @@ function buildProject(intent = 'quote') {
     artwork_transform: artwork.hasArt ? tf(artwork.layers[0].t) : null,
     model: product.master.model,
     printing_method: cfg.hasArtwork ? cfg.method : null,
+    print_colors: cfg.hasArtwork && printColorRange(product, cfg.method) ? cfg.printColors : null,
     print_zones: cfg.hasArtwork ? [cfg.zone] : [],
     quantity: cfg.quantity,
     pricing: { status: p.status, unit: p.unit, total: p.total, currency: p.currency, missing: p.reasons },

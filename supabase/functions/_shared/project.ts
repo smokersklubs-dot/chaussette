@@ -38,7 +38,10 @@ export function configFromProject(product: Json, p: Json) {
   const colorable = product.finishes?.[finish]?.colorable !== false;
   const customColor = ['body', 'cap', 'handle'].some((k) => (k !== 'body' || colorable) && !catalog.includes(colors[k]));
   const quantity = Math.max(1, Math.min(1_000_000, Math.round(Number(p.quantity) || 0)));
-  return { size, material: mat, finish, method, zone, colors, customColor, hasArtwork, quantity, layers: (p.artwork_layers || []).length };
+  const pm = (product.printingMethods || []).find((m: Json) => m.id === method);
+  const maxColors = typeof pm?.maxColors === 'number' && pm.maxColors > 0 ? pm.maxColors : 6;
+  const printColors = pm?.perColor ? Math.max(1, Math.min(maxColors, Math.round(Number(p.print_colors) || 1))) : 1;
+  return { size, material: mat, finish, method, zone, colors, customColor, hasArtwork, quantity, printColors, layers: (p.artwork_layers || []).length };
 }
 
 export function serverPrice(product: Json, cfg: Json) {

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SKLUBS Configurateur
  * Description: Back-office des configurateurs 3D SKLUBS : produits, variantes, matières, couleurs, techniques de marquage, prix par paliers, catégories. Reçoit aussi les projets envoyés par les clients.
- * Version: 1.3.1
+ * Version: 1.4.0
  * Requires PHP: 7.4
  * Author: SKLUBS
  *
@@ -12,7 +12,7 @@
  */
 if (!defined('ABSPATH')) exit;
 
-define('SKLUBS_CFG_VERSION', '1.3.1');
+define('SKLUBS_CFG_VERSION', '1.4.0');
 define('SKLUBS_CFG_DIR', __DIR__);
 define('SKLUBS_CFG_URL', plugin_dir_url(__FILE__));
 const SKLUBS_CFG_NS = 'sklubs/v1';
@@ -423,6 +423,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
     wp_localize_script('sklubs-admin', 'SKLUBS_ADMIN', [
         'root' => esc_url_raw(rest_url(SKLUBS_CFG_NS . '/')), 'nonce' => wp_create_nonce('wp_rest'),
         'configuratorUrl' => (string) sklubs_cfg_app_url(),
+        'pricingUrl' => SKLUBS_CFG_URL . 'site/js/pricing.js?v=' . SKLUBS_CFG_VERSION, // moteur de prix du configurateur (simulation)
         'template' => json_decode((string) @file_get_contents(SKLUBS_CFG_DIR . '/site/admin/template.json'), true),
     ]);
 });

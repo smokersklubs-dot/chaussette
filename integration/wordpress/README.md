@@ -20,6 +20,19 @@ bouteille.sklubs.fr (Vercel, pleine page, sans iframe)        sklubs.fr (WordPre
   « … — personnalisée » (créé automatiquement, non achetable autrement), puis affiche le panier. Le détail
   (référence, couleurs, marquage, aperçu) suit l'article jusqu'à la commande.
 
+## Règles de prix (menu Configurateur → Produits)
+
+Prix unitaire = **produit nu** (palier de quantité de la variante, onglet *Prix & quantités*)
++ **options** par pièce (matière, finition, bague, couleur Pantone)
++ **marquage** par pièce (onglet *Marquage* ; ou dégressif par quantité : *Prix du marquage par quantité*)
++ **couleurs supplémentaires** × prix par couleur (techniques « au nombre de couleurs » : sérigraphie, tampographie)
++ **frais de calage** ÷ quantité (comptés par couleur pour les techniques au nombre de couleurs).
+
+Minimum de commande = le plus grand de : MOQ du produit (sinon 1er palier), MOQ de la technique,
+1er palier du marquage. Un prix vide = « sur devis » (le bouton Commander reste grisé).
+Chaque modèle (Dupliquer / Nouveau produit) a ses propres paliers et prix. La simulation de l'onglet
+*Prix & quantités* utilise le même calcul que le configurateur et le panier (aucun écart possible).
+
 ## Installer / mettre à jour l'extension
 
 1. `python3 tools/build_wp_plugin.py` → `dist/sklubs-configurator.zip`.

@@ -376,17 +376,25 @@
         { label: 'Identifiant', key: 'id', slug: true, width: '100px' },
         { label: 'Nom', key: 'label', width: '150px' },
         { label: 'Rendu 3D', key: 'render', type: 'select', options: [{ value: 'print', label: 'Impression' }, { value: 'engrave', label: 'Gravure' }], width: '120px' },
-        { label: 'Prix € / u', type: 'number', width: '90px', get: (r) => pr.methodUnitPrice[r.id], set: (r, v) => { pr.methodUnitPrice[r.id] = v; } },
-        { label: 'Calage €', type: 'number', width: '90px', get: (r) => pr.setupFee[r.id], set: (r, v) => { pr.setupFee[r.id] = v; } },
         { label: 'Matières', type: 'multi', options: matOpts, get: (r) => matsOf(r.id), set: (r, v) => setMats(r.id, v) },
         { label: 'Zones', type: 'multi', options: zoneOpts, get: (r) => p.rules.zonesByMethod[r.id] || [], set: (r, v) => { p.rules.zonesByMethod[r.id] = v; } },
       ], { newRow: () => ({ id: 'technique', label: 'Nouvelle technique', render: 'print', maxColors: null }) }),
+      h('h3', {}, 'Prix du marquage'),
+      h('p', { class: 'sk-help' }, 'Prix par pièce marquée (s\'ajoute au prix du produit) et frais de calage (fixes, répartis sur la quantité). « Au nombre de couleurs » (sérigraphie, tampographie) : le client choisit le nombre de couleurs ; chaque couleur en plus ajoute le prix « couleur supplémentaire » par pièce, et le calage est compté par couleur. MOQ : quantité minimum pour cette technique. Prix dégressif par quantité : onglet « Prix & quantités ». Vide = sur devis.'),
+      table(p.printingMethods, [
+        { label: 'Technique', key: 'label', width: '150px' },
+        { label: 'Prix € / pièce', type: 'number', width: '100px', get: (r) => pr.methodUnitPrice[r.id], set: (r, v) => { pr.methodUnitPrice[r.id] = v; } },
+        { label: 'Calage €', type: 'number', width: '90px', get: (r) => pr.setupFee[r.id], set: (r, v) => { pr.setupFee[r.id] = v; } },
+        { label: 'Au nombre de couleurs', key: 'perColor', type: 'check', width: '90px' },
+        { label: 'Couleurs max', type: 'number', step: 1, width: '80px', placeholder: 'illimité', get: (r) => (typeof r.maxColors === 'number' ? r.maxColors : null), set: (r, v) => { r.maxColors = v; } },
+        { label: 'Couleur supp. € / pièce', type: 'number', width: '110px', get: (r) => (pr.colorUnitPrice || {})[r.id], set: (r, v) => { pr.colorUnitPrice = pr.colorUnitPrice || {}; pr.colorUnitPrice[r.id] = v; } },
+        { label: 'MOQ technique', type: 'number', step: 1, width: '90px', placeholder: '—', get: (r) => (pr.methodMoq || {})[r.id], set: (r, v) => { pr.methodMoq = pr.methodMoq || {}; pr.methodMoq[r.id] = v; } },
+      ], { add: false, remove: false }),
       h('h3', {}, 'Textes des techniques (étape « Méthode d\'impression »)'),
       table(p.printingMethods, [
         { label: 'Technique', key: 'label', width: '150px' },
         { label: 'Description', key: 'desc' },
         { label: 'Avantages (séparés par ;)', get: (r) => (r.benefits || []).join(' ; '), set: (r, v) => { r.benefits = v.split(';').map((x) => x.trim()).filter(Boolean); } },
-        { label: 'Couleurs max', type: 'number', step: 1, width: '90px', placeholder: 'vide = illimité', get: (r) => (typeof r.maxColors === 'number' ? r.maxColors : null), set: (r, v) => { r.maxColors = v; } },
       ], { add: false, remove: false }),
       h('h3', {}, 'Zones d\'impression'),
       table(p.printZones, [
@@ -423,32 +431,55 @@
         { label: '« Le plus choisi »', key: 'popular', type: 'check', width: '120px' },
       ], { newRow: () => ({ min: rows.length ? Math.round((rows.at(-1).min || 100) * 2) : 100, unit: null, popular: false }), addLabel: '+ Ajouter un palier', after: drawSim }));
     });
-    body.append(h('h3', {}, 'Simulation (configuration par défaut)'), sim);
+    pr.methodTiers = pr.methodTiers || {};
+    body.append(h('h3', {}, 'Prix du marquage par quantité (optionnel)'),
+      h('p', { class: 'sk-help' }, 'Rempli pour une technique, ce tableau remplace son prix unique (onglet Marquage) : à partir de N pièces, prix du marquage par pièce. Le premier palier sert aussi de minimum pour cette technique.'));
+    (p.printingMethods || []).forEach((m) => {
+      pr.methodTiers[m.id] = pr.methodTiers[m.id] || [];
+      const rows = pr.methodTiers[m.id];
+      body.append(h('div', { class: 'sk-tier-head' }, h('h4', { style: 'margin:14px 0 4px' }, m.label || m.id)),
+        table(rows, [
+          { label: 'À partir de (pièces)', key: 'min', type: 'number', step: 1, width: '160px', placeholder: 'ex. 100' },
+          { label: 'Marquage € / pièce', key: 'unit', type: 'number', width: '160px' },
+        ], { newRow: () => ({ min: rows.length ? Math.round((rows.at(-1).min || 100) * 2) : 100, unit: null }), addLabel: '+ Ajouter un palier de marquage', after: drawSim }));
+    });
+    body.append(h('h3', {}, 'Simulation'), sim);
     drawSim();
   }
 
-  // même logique que js/pricing.js du configurateur (prix par palier + suppléments + calage réparti)
+  // simulation avec le moteur de prix du configurateur lui-même (js/pricing.js) : mêmes règles partout
+  let engine = null;
+  const loadEngine = () => (engine ||= import(A.pricingUrl || new URL('../js/pricing.js', document.currentScript?.src || location.href).href));
+  const SIM = { method: null, colors: 1, art: true };
   function simulate(box, p) {
-    const pr = p.pricing || {}; const cur = pr.currency || 'EUR';
-    const mat = p.defaultMaterial || p.materials?.[0]?.id; const fin = p.materials?.find((m) => m.id === mat)?.defaultFinish;
-    const ring = p.colors?.defaults?.ring || p.ringFinishes?.[0]?.id; const method = p.printingMethods?.[0]?.id;
-    const v = (x) => (x === null || x === undefined || x === '' || x === 'TO_DEFINE' ? null : Number(x));
-    const add = [v(pr.materialSurcharge?.[mat]), v(pr.finishSurcharge?.[fin]), pr.ringSurcharge ? v(pr.ringSurcharge[ring]) : 0];
-    const mUnit = v(pr.methodUnitPrice?.[method]); const setup = v(pr.setupFee?.[method]);
-    box.innerHTML = '';
-    const missing = add.some((x) => x === null);
-    (p.sizes || []).forEach((s) => {
-      const rows = (pr.tiers?.[s.id] || []).filter((t) => v(t.min));
-      const t = h('table', { class: 'sk-table sk-simt' }, h('thead', {}, h('tr', {}, ['Quantité', 'Sans marquage', `Avec ${p.printingMethods?.[0]?.label || 'marquage'}`, 'Total avec marquage'].map((x) => h('th', {}, x)))),
-        h('tbody', {}, rows.map((r) => {
-          const base = v(r.unit); const plain = base === null || missing ? null : base + add.reduce((a, b) => a + (b || 0), 0);
-          const marked = plain === null || mUnit === null || setup === null ? null : plain + mUnit + setup / r.min;
-          return h('tr', {}, h('td', {}, `${r.min} pcs`), h('td', {}, money(plain, cur)), h('td', {}, money(marked, cur)), h('td', {}, money(marked === null ? null : marked * r.min, cur)));
-        })));
-      box.append(h('p', { class: 'sk-sub' }, s.label || s.id), rows.length ? t : h('p', { class: 'sk-help' }, 'Aucun palier.'));
-    });
-    if (missing) box.append(h('p', { class: 'sk-help warn' }, 'Un supplément de la configuration par défaut est vide : le client verra « sur devis ».'));
+    box.innerHTML = '<p class="sk-help">Calcul…</p>';
+    loadEngine().then(({ computePrice, printColorRange }) => {
+      const pr = p.pricing || {}; const cur = pr.currency || 'EUR';
+      const mat = p.defaultMaterial || p.materials?.[0]?.id;
+      const fin = p.materials?.find((m) => m.id === mat)?.defaultFinish;
+      if (!SIM.method || !(p.printingMethods || []).some((m) => m.id === SIM.method)) SIM.method = p.printingMethods?.[0]?.id;
+      const range = printColorRange(p, SIM.method);
+      const base = { material: mat, finish: fin, colors: { ...(p.colors?.defaults || {}), ring: p.colors?.defaults?.ring || p.ringFinishes?.[0]?.id }, zone: null, method: SIM.method, printColors: range ? SIM.colors : 1, customColor: false };
+      box.innerHTML = '';
+      const controls = h('div', { class: 'sk-inline', style: 'gap:12px;margin-bottom:8px' },
+        h('label', {}, 'Technique ', h('select', { onchange: (e) => { SIM.method = e.target.value; simulate(box, p); } }, (p.printingMethods || []).map((m) => h('option', { value: m.id, selected: m.id === SIM.method ? 'selected' : null }, m.label || m.id)))),
+        range ? h('label', {}, 'Couleurs ', h('select', { onchange: (e) => { SIM.colors = +e.target.value; simulate(box, p); } }, Array.from({ length: range.max }, (_, i) => h('option', { value: i + 1, selected: i + 1 === SIM.colors ? 'selected' : null }, String(i + 1))))) : null);
+      box.append(controls);
+      (p.sizes || []).forEach((s) => {
+        const mins = [...new Set([...(pr.tiers?.[s.id] || []).map((t) => +t.min), ...((pr.methodTiers || {})[SIM.method] || []).map((t) => +t.min)].filter((x) => x > 0))].sort((a, b) => a - b);
+        if (!mins.length) { box.append(h('p', { class: 'sk-help' }, `${s.label || s.id} : ajoutez des paliers pour voir les prix.`)); return; }
+        const t = h('table', { class: 'sk-table sk-simt' }, h('thead', {}, h('tr', {}, ['Quantité', 'Sans marquage € / pièce', 'Avec marquage € / pièce', 'Total avec marquage', 'Remarque'].map((x) => h('th', {}, x)))),
+          h('tbody', {}, mins.map((q) => {
+            const plain = computePrice(p, { ...base, size: s.id, quantity: q, hasArtwork: false });
+            const marked = computePrice(p, { ...base, size: s.id, quantity: q, hasArtwork: true });
+            const note = marked.status === 'factory' ? (marked.belowMoq ? `minimum ${marked.moq} pcs` : `à renseigner : ${marked.reasons.join(', ')}`) : '';
+            return h('tr', {}, h('td', {}, `${q} pcs`), h('td', {}, money(plain.unit, cur)), h('td', {}, money(marked.unit, cur)), h('td', {}, money(marked.total, cur)), h('td', { class: 'sk-help' }, note));
+          })));
+        box.append(h('div', { class: 'sk-sub' }, s.label || s.id), t);
+      });
+    }).catch((e) => { box.innerHTML = `<p class="sk-help warn">Simulation indisponible : ${e.message}</p>`; });
   }
+
 
   function advanced(body, p) {
     const ta = h('textarea', { class: 'sk-json', spellcheck: 'false' });

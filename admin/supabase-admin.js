@@ -62,7 +62,7 @@
 
   function start(user) {
     who.textContent = user.email;
-    window.SKLUBS_ADMIN = { api, media, projects, configuratorUrl: './', logout: async () => { await sb.auth.signOut(); location.reload(); } };
+    window.SKLUBS_ADMIN = { api, media, projects, configuratorUrl: './', pricingUrl: new URL('js/pricing.js', location.href).href, logout: async () => { await sb.auth.signOut(); location.reload(); } };
     fetch('admin/template.json').then((r) => (r.ok ? r.json() : null)).catch(() => null).then((tpl) => {
       window.SKLUBS_ADMIN.template = tpl;
       const s = document.createElement('script');

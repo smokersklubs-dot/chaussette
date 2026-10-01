@@ -487,3 +487,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   .review-card { max-height: 60%; }
   #modeSeg { display: none !important; }
 }
+
+/* détail du prix */
+.price-lines { margin-top: 12px; font-size: 12.5px; }
+.price-lines summary { cursor: pointer; color: var(--ink-2); font-weight: 500; }
+.price-lines ul { list-style: none; display: grid; gap: 5px; margin-top: 8px; }
+.price-lines li { display: flex; justify-content: space-between; gap: 12px; color: var(--ink-2); }
+.price-lines li b { font: 500 12px var(--mono); color: var(--ink); }

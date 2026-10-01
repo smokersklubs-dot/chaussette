@@ -43,72 +43,112 @@ export function tiersFor(product, sizeId) {
     .sort((a, b) => a.min - b.min);
 }
 
+// Nombre de couleurs du marquage : techniques « au nombre de couleurs » (sérigraphie, tampographie)
+export function printColorRange(product, methodId) {
+  const m = (product.printingMethods || []).find((x) => x.id === methodId);
+  if (!m?.perColor) return null;
+  return { min: 1, max: typeof m.maxColors === 'number' && m.maxColors > 0 ? m.maxColors : 6 };
+}
+
+// Prix du marquage par quantité : pricing.methodTiers[methodId] = [{ min, unit }] (sinon prix unique methodUnitPrice)
+export function methodTiersFor(product, methodId) {
+  const t = product.pricing?.methodTiers?.[methodId];
+  if (!Array.isArray(t)) return null;
+  const rows = t.filter((x) => isDefined(x?.min)).map((x) => ({ min: Number(x.min), unit: isDefined(x.unit) ? Number(x.unit) : null })).sort((a, b) => a.min - b.min);
+  return rows.length ? rows : null;
+}
+
+const tierAt = (rows, qty) => [...rows].reverse().find((t) => qty >= t.min) || null;
+
+// Règles de prix (toutes les valeurs viennent de la fiche produit ; vide = « sur devis ») :
+//   prix unitaire = produit nu (palier de quantité de la variante)
+//                 + options (matière, finition, bague, couleur personnalisée)
+//                 + marquage (palier de quantité de la technique, + couleurs supplémentaires si « au nombre de couleurs »)
+//                 + frais de calage ÷ quantité (par couleur pour les techniques au nombre de couleurs)
+//   minimum de commande = le plus grand de : MOQ produit (sinon 1er palier), MOQ de la technique, 1er palier de la technique
 export function computePrice(product, cfg) {
   const p = product.pricing || {};
   const qty = Math.max(1, Math.round(cfg.quantity || 0));
   const reasons = [];
   const need = (label, v) => { if (!isDefined(v)) { if (!reasons.includes(label)) reasons.push(label); return 0; } return Number(v); };
 
-  // suppléments par unité (indépendants de la quantité)
-  const mat = need('supplément matière', p.materialSurcharge?.[cfg.material]);
-  const fin = need('supplément finition', p.finishSurcharge?.[cfg.finish]);
-  const ring = p.ringSurcharge ? need('supplément bague', p.ringSurcharge[cfg.colors?.ring]) : 0;
-  const custom = cfg.customColor && p.customColorSurcharge !== undefined ? need('supplément couleur personnalisée', p.customColorSurcharge) : 0;
-  let method = 0;
-  let setup = 0;
-  if (cfg.hasArtwork) {
-    method = need('prix marquage', p.methodUnitPrice?.[cfg.method]);
-    setup = need('frais de calage', p.setupFee?.[cfg.method]);
-  }
-  const addons = mat + fin + ring + custom + method;
-
-  // base selon les paliers
   const tiers = tiersFor(product, cfg.size);
-  let base = 0;
-  let tier = null;
-  let belowMin = false;
-  if (tiers && tiers.length) {
-    tier = [...tiers].reverse().find((t) => qty >= t.min) || null;
-    if (!tier) belowMin = true;
-    else base = need('prix du palier', tier.unit);
-  } else {
-    base = need('prix de base', p.basePriceBySize?.[cfg.size]);
-  }
+  const mTiers = cfg.hasArtwork ? methodTiersFor(product, cfg.method) : null;
+  const range = cfg.hasArtwork ? printColorRange(product, cfg.method) : null;
+  const colors = range ? Math.min(range.max, Math.max(1, Math.round(cfg.printColors || 1))) : 1;
+  const methodLabel = (product.printingMethods || []).find((m) => m.id === cfg.method)?.label || 'Marquage';
 
+  // détail du prix pour une quantité donnée (q) : lignes par unité + frais fixes
+  const detail = (q, collect) => {
+    const n = collect ? need : (l, v) => (isDefined(v) ? Number(v) : 0);
+    const lines = [];
+    let base = 0;
+    let tier = null;
+    if (tiers && tiers.length) {
+      tier = tierAt(tiers, q);
+      base = tier ? n('prix du palier', tier.unit) : 0;
+    } else base = n('prix de base', p.basePriceBySize?.[cfg.size]);
+    lines.push({ key: 'base', label: tier ? `Produit (dès ${tier.min} pcs)` : 'Produit', unit: base });
+    const add = (key, label, v) => { const x = n(label, v); if (x) lines.push({ key, label: label.replace(/^supplément /, '').replace(/^./, (c) => c.toUpperCase()), unit: x }); };
+    add('material', 'supplément matière', p.materialSurcharge?.[cfg.material]);
+    add('finish', 'supplément finition', p.finishSurcharge?.[cfg.finish]);
+    if (p.ringSurcharge) add('ring', 'supplément bague', p.ringSurcharge[cfg.colors?.ring]);
+    if (cfg.customColor && p.customColorSurcharge !== undefined) add('custom', 'supplément couleur personnalisée', p.customColorSurcharge);
+    let setup = 0;
+    if (cfg.hasArtwork) {
+      let mu;
+      if (mTiers) { const t = tierAt(mTiers, q); mu = n('prix marquage', t ? t.unit : null); }
+      else mu = n('prix marquage', p.methodUnitPrice?.[cfg.method]);
+      lines.push({ key: 'method', label: `Marquage ${methodLabel}${range ? ` (1 couleur)` : ''}`, unit: mu });
+      if (range && colors > 1) lines.push({ key: 'colors', label: `Couleurs supplémentaires (${colors - 1})`, unit: (colors - 1) * n('prix par couleur supplémentaire', p.colorUnitPrice?.[cfg.method]) });
+      setup = n('frais de calage', p.setupFee?.[cfg.method]) * (range ? colors : 1);
+      if (setup) lines.push({ key: 'setup', label: `Frais de calage${range && colors > 1 ? ` (${colors} couleurs)` : ''}`, unit: setup / q, total: setup });
+    }
+    let discount = 0;
+    if (Array.isArray(p.quantityDiscounts)) for (const t of p.quantityDiscounts) if (q >= t.min) discount = t.discount;
+    const perUnit = lines.filter((l) => l.key !== 'setup').reduce((s, l) => s + l.unit, 0);
+    const unit = perUnit * (1 - discount) + setup / q;
+    return { lines, unit, setup, tier, discount, belowFirstTier: !!(tiers && tiers.length && !tier) };
+  };
+
+  const d = detail(qty, true);
+  const moqs = [];
   const moqRaw = product.quantity?.moq;
-  const moq = isDefined(moqRaw) ? Number(moqRaw) : tiers?.length ? tiers[0].min : null;
+  if (isDefined(moqRaw)) moqs.push(Number(moqRaw)); else if (tiers?.length) moqs.push(tiers[0].min);
+  if (cfg.hasArtwork) {
+    if (isDefined(p.methodMoq?.[cfg.method])) moqs.push(Number(p.methodMoq[cfg.method]));
+    if (mTiers) moqs.push(mTiers[0].min);
+  }
+  const moq = moqs.length ? Math.max(...moqs) : null;
   if (moq === null) reasons.push('MOQ');
-  const belowMoq = moq !== null && qty < moq;
-
-  let discount = 0;
-  if (Array.isArray(p.quantityDiscounts)) for (const t of p.quantityDiscounts) if (qty >= t.min) discount = t.discount;
-
-  const unitAt = (q, b) => (b + addons) * (1 - discount) + setup / q;
-  const unit = unitAt(qty, base);
-  const known = !reasons.length && !belowMoq && !belowMin;
+  const belowMoq = (moq !== null && qty < moq) || d.belowFirstTier;
+  const known = !reasons.length && !belowMoq;
   const status = known ? (p.priceMode === 'estimated' ? 'estimated' : 'instant') : 'factory';
 
-  // tableau des paliers (même configuration) pour l'affichage
+  // tableau des paliers (même configuration) : chaque palier recalculé avec ses propres prix de marquage
   let table = null;
   if (tiers && tiers.length && !reasons.length) {
-    table = tiers.map((t) => ({ min: t.min, unit: isDefined(t.unit) ? (t.unit + addons) * (1 - discount) + setup / t.min : null }));
+    table = tiers.filter((t) => moq === null || t.min >= moq || t === tiers[0]).map((t) => ({ min: Math.max(t.min, moq || 0), unit: isDefined(t.unit) ? detail(Math.max(t.min, moq || 0), false).unit : null }));
+    table = table.filter((r, i) => table.findIndex((o) => o.min === r.min) === i);
     const first = table[0]?.unit;
-    table.forEach((r) => { r.saving = first && r.unit !== null ? Math.max(0, 1 - r.unit / first) : 0; r.active = tier && r.min === tier.min; });
+    table.forEach((r) => { r.saving = first && r.unit !== null ? Math.max(0, 1 - r.unit / first) : 0; r.active = !!(d.tier && r.min <= qty && !table.some((o) => o.min > r.min && o.min <= qty)); });
   }
   const firstUnit = table?.[0]?.unit;
   return {
     status,
     reasons,
-    belowMoq: belowMoq || belowMin,
+    belowMoq,
     moq,
     quantity: qty,
-    unit: known ? unit : null,
-    total: known ? unit * qty : null,
-    saving: known && firstUnit ? Math.max(0, 1 - unit / firstUnit) : 0,
-    setup: cfg.hasArtwork ? setup : 0,
+    unit: known ? d.unit : null,
+    total: known ? d.unit * qty : null,
+    saving: known && firstUnit ? Math.max(0, 1 - d.unit / firstUnit) : 0,
+    setup: cfg.hasArtwork ? d.setup : 0,
+    lines: known ? d.lines : null,
+    printColors: range ? colors : null,
     tiers: table,
     leadTime: product.production?.leadTime || null,
-    discount,
+    discount: d.discount,
     currency: p.currency || 'EUR',
   };
 }

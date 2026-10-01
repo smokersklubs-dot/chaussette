@@ -200,7 +200,8 @@
         "Couleurs vives et opaques",
         "Adaptée aux logos en aplats",
         "Nombre de couleurs : à confirmer usine"
-      ]
+      ],
+      "perColor": true
     },
     {
       "id": "pad",
@@ -212,7 +213,8 @@
         "Petites zones",
         "Bonne précision sur surface courbe",
         "Nombre de couleurs : à confirmer usine"
-      ]
+      ],
+      "perColor": true
     },
     {
       "id": "wrap360",
@@ -312,7 +314,13 @@
     "tiers": {
       "master": []
     },
-    "taxLabel": "HT"
+    "taxLabel": "HT",
+    "methodTiers": {},
+    "colorUnitPrice": {
+      "screen": null,
+      "pad": null
+    },
+    "methodMoq": {}
   },
   "master": {
     "model": "bottle-master/export/SKLUBS_BOTTLE_WEB.glb",
